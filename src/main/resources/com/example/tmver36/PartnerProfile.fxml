@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.String?>
+<?import javafx.collections.FXCollections?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="900" prefWidth="1360" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.PartnerProfileController">
+  <left>
+    <VBox minWidth="228" prefWidth="228" spacing="14" styleClass="sidebar">
+      <HBox alignment="CENTER_LEFT" spacing="12">
+        <Label styleClass="brand-mark" text="TM" />
+        <VBox spacing="3">
+          <Label styleClass="brand" text="TeacherMatch" />
+          <Label styleClass="brand-sub" text="TALENT CONNECTION" />
+        </VBox>
+      </HBox>
+      <Label styleClass="nav-caption" text="WORKSPACE / PARTNER" />
+      <Button fx:id="nav_PartnerDashboard" maxWidth="Infinity" styleClass="nav" text="Shared Profiles" />
+      <Button fx:id="nav_PartnerProfile" maxWidth="Infinity" styleClass="nav,active" text="Candidate Details" />
+      <Button fx:id="nav_PartnerInterview" maxWidth="Infinity" styleClass="nav" text="Interviews &amp; Results" />
+      <Region VBox.vgrow="ALWAYS" />
+      <VBox spacing="6" />
+      <HBox alignment="CENTER_LEFT" spacing="12">
+        <Label alignment="CENTER" minHeight="50" minWidth="50" styleClass="avatar" text="BS" />
+        <VBox spacing="4">
+          <Label styleClass="sidebar-name" text="Bright School" />
+          <Label styleClass="nav-foot" text="Hiring Partner" />
+        </VBox>
+      </HBox>
+      <Button fx:id="nav_Login" maxWidth="Infinity" styleClass="nav" text="Logout" />
+    </VBox>
+  </left>
+  <center>
+    <BorderPane>
+      <top>
+        <HBox alignment="CENTER_LEFT" spacing="12" styleClass="topbar">
+          <Label styleClass="breadcrumb" text="Hiring Partner / Candidate Details" />
+          <Region HBox.hgrow="ALWAYS" />
+          <Label styleClass="badge,badge-gray" text="DEMO" />
+          <Label styleClass="muted" text="14/10/2026" />
+          <Label alignment="CENTER" minHeight="36" minWidth="36" styleClass="avatar-small" text="BS" />
+        </HBox>
+      </top>
+      <center>
+        <ScrollPane fitToWidth="true" hbarPolicy="NEVER">
+          <content>
+            <VBox spacing="22" styleClass="content">
+              <HBox alignment="CENTER_LEFT" spacing="12">
+                <VBox spacing="7">
+                  <Label styleClass="page-title" text="Candidate Details" />
+                  <Label styleClass="muted" text="Emily Martin · Profile shared by Matching for Bright School." wrapText="true" />
+                </VBox>
+                <Region HBox.hgrow="ALWAYS" />
+              </HBox>
+              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                <HBox alignment="CENTER_LEFT" spacing="12">
+                  <Label alignment="CENTER" minHeight="50" minWidth="50" styleClass="avatar" text="EM" />
+                  <VBox spacing="6">
+                    <Label styleClass="page-title" text="Emily Martin" />
+                    <Label styleClass="muted" text="United Kingdom · 4 years · Primary · Hanoi" />
+                  </VBox>
+                  <Region HBox.hgrow="ALWAYS" />
+                  <Label styleClass="badge,badge-green" text="Access Granted" />
+                </HBox>
+              </VBox>
+              <HBox alignment="CENTER_LEFT" spacing="12">
+                <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                  <Label styleClass="section-title" text="Video &amp; Documents" />
+                  <VBox alignment="CENTER" minHeight="220" spacing="15" styleClass="video-panel">
+                    <Label alignment="CENTER" styleClass="video-initial" text="EM" />
+                    <Label styleClass="video-caption" text="INTRO VIDEO" />
+                    <Label styleClass="video-caption" text="Video preview area · mock data" />
+                    <Button fx:id="playIntroButton" styleClass="primary" text="Watch intro video" />
+                  </VBox>
+                  <HBox alignment="CENTER_LEFT" spacing="12">
+                    <Button fx:id="partnerCvButton" styleClass="secondary" text="CV (.pdf)" />
+                    <Button fx:id="partnerCertButton" styleClass="secondary" text="Certificates" />
+                    <Button fx:id="partnerDemoButton" styleClass="secondary" text="Video demo" />
+                  </HBox>
+                  <Label styleClass="section-title" text="Introduction" />
+                  <Label maxWidth="510" styleClass="body" text="Experienced primary English teacher with a CELTA certificate. Available from December 2026." wrapText="true" />
+                </VBox>
+                <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                  <Label styleClass="section-title" text="Shortlist Evaluation" />
+                  <VBox spacing="7" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Decision" />
+                    <ComboBox fx:id="shortlistDecision" maxWidth="Infinity" prefWidth="230">
+                      <items>
+                        <FXCollections fx:factory="observableArrayList">
+                          <String fx:value="Pending" />
+                          <String fx:value="Shortlist" />
+                          <String fx:value="Unqualified" />
+                        </FXCollections>
+                      </items>
+                      <value>
+                        <String fx:value="Pending" />
+                      </value>
+                    </ComboBox>
+                  </VBox>
+                  <VBox spacing="7">
+                    <Label styleClass="field-label" text="Comment" />
+                    <TextArea fx:id="shortlistComment" prefHeight="145" promptText="Comments on suitability..." text="" wrapText="true" />
+                  </VBox>
+                  <Button fx:id="saveShortlistButton" maxWidth="Infinity" styleClass="secondary" text="Save evaluation" />
+                  <Separator />
+                  <Label styleClass="section-title" text="Invite for interview" />
+                  <Label maxWidth="Infinity" styleClass="note" text="Select from the teacher's declared time slots. The request will await the teacher's confirmation." wrapText="true" />
+                  <Button fx:id="nav_PartnerInterview__2" maxWidth="Infinity" styleClass="primary" text="Select time &amp; request interview" />
+                </VBox>
+              </HBox>
+            </VBox>
+          </content>
+        </ScrollPane>
+      </center>
+    </BorderPane>
+  </center>
+</BorderPane>

@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.String?>
+<?import javafx.collections.FXCollections?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="900" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.AdminAccountsController">
+  <left>
+    <VBox minWidth="228" prefWidth="228" spacing="14" styleClass="sidebar">
+      <HBox alignment="CENTER_LEFT" spacing="12">
+        <Label styleClass="brand-mark" text="GT" />
+        <VBox spacing="3">
+          <Label prefHeight="25.0" prefWidth="133.0" styleClass="brand" text="GlobalTeacher" />
+          <Label styleClass="brand-sub" text="TALENT CONNECTION" />
+        </VBox>
+      </HBox>
+      <Label styleClass="nav-caption" text="WORKSPACE / ADMIN" />
+      <Button fx:id="nav_AdminAccounts" maxWidth="Infinity" styleClass="nav,active" text="Accounts &amp; Permissions" />
+      <Button fx:id="nav_AdminLogs" maxWidth="Infinity" styleClass="nav" text="System Logs" />
+      <Region VBox.vgrow="ALWAYS" />
+      <VBox spacing="6">
+        <Label styleClass="nav-caption" />
+        <Label styleClass="nav-foot" />
+      </VBox>
+      <HBox alignment="CENTER_LEFT" spacing="12">
+        <Label alignment="CENTER" minHeight="50" minWidth="50" styleClass="avatar" text="AD" />
+        <VBox spacing="4">
+          <Label styleClass="sidebar-name" text="Administrator" />
+          <Label styleClass="nav-foot" text="System Admin" />
+        </VBox>
+      </HBox>
+      <Button fx:id="nav_Login" maxWidth="Infinity" onAction="#handleLogout" styleClass="nav" text="Logout" />
+    </VBox>
+  </left>
+  <center>
+    <BorderPane>
+      <top>
+        <HBox alignment="CENTER_LEFT" spacing="12" styleClass="topbar">
+          <Label styleClass="breadcrumb" text="System Admin / Accounts &amp; Permissions" />
+          <Region HBox.hgrow="ALWAYS" />
+          <Label styleClass="badge,badge-gray" text="DEMO" />
+          <Label styleClass="muted" text="14/10/2026" />
+          <Label alignment="CENTER" minHeight="36" minWidth="36" styleClass="avatar-small" text="AD" />
+        </HBox>
+      </top>
+      <center>
+        <ScrollPane hbarPolicy="AS_NEEDED">
+          <content>
+            <VBox spacing="22" styleClass="content">
+              <HBox alignment="CENTER_LEFT" spacing="12">
+                <VBox spacing="7">
+                  <Label styleClass="page-title" text="Accounts &amp; Permissions" />
+                  <Label styleClass="muted" wrapText="true" />
+                </VBox>
+                <Region HBox.hgrow="ALWAYS" />
+              </HBox>
+              <TabPane tabClosingPolicy="UNAVAILABLE">
+                <Tab text="Accounts">
+                  <content>
+                    <VBox spacing="18" styleClass="tab-body">
+                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                        <HBox alignment="CENTER_LEFT" spacing="12">
+                          <VBox fx:id="searchField" spacing="7" HBox.hgrow="ALWAYS">
+                            <Label styleClass="field-label" text="Search accounts" />
+                            <TextField fx:id="accountSearch" prefWidth="280" promptText="Name or email..." text="" />
+                          </VBox>
+                          <VBox spacing="7" HBox.hgrow="ALWAYS">
+                            <Label styleClass="field-label" text="Role" />
+                            <ComboBox maxWidth="Infinity" prefWidth="230">
+                              <items>
+                                <FXCollections fx:factory="observableArrayList">
+                                  <String fx:value="All" />
+                                  <String fx:value="Teacher" />
+                                  <String fx:value="Matching Staff" />
+                                  <String fx:value="Partner" />
+                                  <String fx:value="System Admin" />
+                                </FXCollections>
+                              </items>
+                              <value>
+                                <String fx:value="All" />
+                              </value>
+                            </ComboBox>
+                          </VBox>
+                          <Button fx:id="searchAccountsButton" onAction="#handleSearch" styleClass="secondary" text="Search" />
+                        </HBox>
+                        <VBox spacing="0" styleClass="table" />
+                                    <TableView fx:id="accountTable" prefHeight="200.0" prefWidth="200.0">
+                                      <columns>
+                                        <TableColumn fx:id="colUsername" prefWidth="248.66666162014008" text="Account" />
+                                        <TableColumn fx:id="colEmail" minWidth="0.0" prefWidth="295.33338928222656" text="Email" />
+                                          <TableColumn fx:id="colRole" minWidth="0.0" prefWidth="227.99993896484375" text="Role" />
+                                          <TableColumn fx:id="colStatus" prefWidth="227.3333740234375" text="Status" />
+                                      </columns>
+                                    </TableView>
+                      </VBox>
+                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                        <Label styleClass="section-title" text="Create / Update profile" />
+                        <HBox alignment="CENTER_LEFT" spacing="12">
+                          <VBox spacing="7" HBox.hgrow="ALWAYS">
+                            <Label styleClass="field-label" text="Account name" />
+                            <TextField fx:id="accountName" prefWidth="280" promptText="Username" text="" />
+                          </VBox>
+                          <VBox spacing="7" HBox.hgrow="ALWAYS">
+                            <Label styleClass="field-label" text="Email" />
+                            <TextField fx:id="accountEmail" prefWidth="280" promptText="you@example.com" text="" />
+                          </VBox>
+                          <VBox spacing="7" HBox.hgrow="ALWAYS">
+                            <Label styleClass="field-label" text="Role" />
+                            <ComboBox fx:id="accountRole" maxWidth="Infinity" prefWidth="230">
+                              <items>
+                                <FXCollections fx:factory="observableArrayList">
+                                  <String fx:value="Teacher" />
+                                  <String fx:value="Matching Staff" />
+                                  <String fx:value="Partner" />
+                                  <String fx:value="System Admin" />
+                                </FXCollections>
+                              </items>
+                              <value>
+                                <String fx:value="Teacher" />
+                              </value>
+                            </ComboBox>
+                          </VBox>
+                        </HBox>
+                        <HBox alignment="CENTER_LEFT" spacing="12">
+                          <Button fx:id="deleteAccountButton" styleClass="danger" text="Delete selected account" />
+                          <Region HBox.hgrow="ALWAYS" />
+                          <Button fx:id="saveAccountButton" styleClass="primary" text="Save account" />
+                        </HBox>
+                      </VBox>
+                    </VBox>
+                  </content>
+                </Tab>
+                <Tab text="Permissions by role">
+                  <content>
+                    <VBox spacing="18" styleClass="tab-body">
+                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                        <Label styleClass="section-title" text="System permission scope" />
+                        <VBox spacing="0" styleClass="table">
+                          <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
+                            <VBox alignment="CENTER_LEFT" maxWidth="240" minWidth="240" prefWidth="240" spacing="0">
+                              <Label maxWidth="224" styleClass="table-head" text="ROLE" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="730" minWidth="730" prefWidth="730" spacing="0">
+                              <Label maxWidth="714" styleClass="table-head" text="SCOPE" wrapText="true" />
+                            </VBox>
+                          </HBox>
+                          <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                            <VBox alignment="CENTER_LEFT" maxWidth="240" minWidth="240" prefWidth="240" spacing="0">
+                              <Label maxWidth="224" styleClass="table-text" text="Teacher" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="730" minWidth="730" prefWidth="730" spacing="0">
+                              <Label maxWidth="714" styleClass="table-text" text="Own profile, documents, availability, schedule confirmation, history." wrapText="true" />
+                            </VBox>
+                          </HBox>
+                          <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                            <VBox alignment="CENTER_LEFT" maxWidth="240" minWidth="240" prefWidth="240" spacing="0">
+                              <Label maxWidth="224" styleClass="table-text" text="Matching Staff" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="730" minWidth="730" prefWidth="730" spacing="0">
+                              <Label maxWidth="714" styleClass="table-text" text="Review, search profiles, grant/revoke access, coordinate, feedback." wrapText="true" />
+                            </VBox>
+                          </HBox>
+                          <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                            <VBox alignment="CENTER_LEFT" maxWidth="240" minWidth="240" prefWidth="240" spacing="0">
+                              <Label maxWidth="224" styleClass="table-text" text="Partner" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="730" minWidth="730" prefWidth="730" spacing="0">
+                              <Label maxWidth="714" styleClass="table-text" text="Granted profiles only, shortlist, interview requests, results." wrapText="true" />
+                            </VBox>
+                          </HBox>
+                          <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                            <VBox alignment="CENTER_LEFT" maxWidth="240" minWidth="240" prefWidth="240" spacing="0">
+                              <Label maxWidth="224" styleClass="table-text" text="System Admin" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="730" minWidth="730" prefWidth="730" spacing="0">
+                              <Label maxWidth="714" styleClass="table-text" text="Accounts, permissions, and system logs." wrapText="true" />
+                            </VBox>
+                          </HBox>
+                        </VBox>
+                        <VBox spacing="7" HBox.hgrow="ALWAYS">
+                          <Label styleClass="field-label" text="Account to assign role" />
+                          <ComboBox maxWidth="Infinity" prefWidth="230">
+                            <items>
+                              <FXCollections fx:factory="observableArrayList">
+                                <String fx:value="Emily Martin" />
+                                <String fx:value="Linh Anh" />
+                                <String fx:value="Bright School" />
+                                <String fx:value="Administrator" />
+                              </FXCollections>
+                            </items>
+                            <value>
+                              <String fx:value="Linh Anh" />
+                            </value>
+                          </ComboBox>
+                        </VBox>
+                        <VBox spacing="7" HBox.hgrow="ALWAYS">
+                          <Label styleClass="field-label" text="New role" />
+                          <ComboBox maxWidth="Infinity" prefWidth="230">
+                            <items>
+                              <FXCollections fx:factory="observableArrayList">
+                                <String fx:value="Teacher" />
+                                <String fx:value="Matching Staff" />
+                                <String fx:value="Partner" />
+                                <String fx:value="System Admin" />
+                              </FXCollections>
+                            </items>
+                            <value>
+                              <String fx:value="Matching Staff" />
+                            </value>
+                          </ComboBox>
+                        </VBox>
+                        <Button fx:id="assignRoleButton" styleClass="primary" text="Assign role" />
+                      </VBox>
+                    </VBox>
+                  </content>
+                </Tab>
+              </TabPane>
+            </VBox>
+          </content>
+        </ScrollPane>
+      </center>
+    </BorderPane>
+  </center>
+</BorderPane>

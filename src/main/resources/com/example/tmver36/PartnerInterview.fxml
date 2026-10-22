@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.String?>
+<?import javafx.collections.FXCollections?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="900" prefWidth="1360" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.PartnerInterviewController">
+  <left>
+    <VBox minWidth="228" prefWidth="228" spacing="14" styleClass="sidebar">
+      <HBox alignment="CENTER_LEFT" spacing="12">
+        <Label styleClass="brand-mark" text="TM" />
+        <VBox spacing="3">
+          <Label styleClass="brand" text="TeacherMatch" />
+          <Label styleClass="brand-sub" text="TALENT CONNECTION" />
+        </VBox>
+      </HBox>
+      <Label styleClass="nav-caption" text="WORKSPACE / PARTNER" />
+      <Button fx:id="nav_PartnerDashboard" maxWidth="Infinity" styleClass="nav" text="Shared Profiles" />
+      <Button fx:id="nav_PartnerProfile" maxWidth="Infinity" styleClass="nav" text="Candidate Details" />
+      <Button fx:id="nav_PartnerInterview" maxWidth="Infinity" styleClass="nav,active" text="Interviews &amp; Results" />
+      <Region VBox.vgrow="ALWAYS" />
+      <VBox spacing="6" />
+      <HBox alignment="CENTER_LEFT" spacing="12">
+        <Label alignment="CENTER" minHeight="50" minWidth="50" styleClass="avatar" text="BS" />
+        <VBox spacing="4">
+          <Label styleClass="sidebar-name" text="Bright School" />
+          <Label styleClass="nav-foot" text="Hiring Partner" />
+        </VBox>
+      </HBox>
+      <Button fx:id="nav_Login" maxWidth="Infinity" styleClass="nav" text="Logout" />
+    </VBox>
+  </left>
+  <center>
+    <BorderPane>
+      <top>
+        <HBox alignment="CENTER_LEFT" spacing="12" styleClass="topbar">
+          <Label styleClass="breadcrumb" text="Hiring Partner / Shared Profiles" />
+          <Region HBox.hgrow="ALWAYS" />
+          <Label styleClass="badge,badge-gray" text="DEMO" />
+          <Label styleClass="muted" text="14/10/2026" />
+          <Label alignment="CENTER" minHeight="36" minWidth="36" styleClass="avatar-small" text="BS" />
+        </HBox>
+      </top>
+      <center>
+        <ScrollPane fitToWidth="true" hbarPolicy="NEVER">
+          <content>
+            <VBox spacing="22" styleClass="content">
+              <HBox alignment="CENTER_LEFT" spacing="12">
+                <VBox spacing="7">
+                  <Label styleClass="page-title" text="Interviews &amp; Results" />
+                  <Label styleClass="muted" text="Select teacher's available time and send evaluation post-interview." wrapText="true" />
+                </VBox>
+                <Region HBox.hgrow="ALWAYS" />
+              </HBox>
+              <TabPane tabClosingPolicy="UNAVAILABLE">
+                <Tab text="Interview Request">
+                  <content>
+                    <VBox spacing="18" styleClass="tab-body">
+                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                        <HBox alignment="CENTER_LEFT" spacing="12">
+                          <Label styleClass="section-title" text="Emily Martin · Shared time slots" />
+                          <Region HBox.hgrow="ALWAYS" />
+                          <Label styleClass="badge,badge-gray" text="UTC+7" />
+                        </HBox>
+                        <VBox spacing="7" HBox.hgrow="ALWAYS">
+                          <Label styleClass="field-label" text="Select time slot" />
+                          <ComboBox fx:id="requestedSlot" maxWidth="Infinity" prefWidth="600">
+                            <items>
+                              <FXCollections fx:factory="observableArrayList">
+                                <String fx:value="16/10/2026 · 14:00 - 15:00" />
+                                <String fx:value="19/10/2026 · 09:00 - 10:00" />
+                              </FXCollections>
+                            </items>
+                            <value>
+                              <String fx:value="16/10/2026 · 14:00 - 15:00" />
+                            </value>
+                          </ComboBox>
+                        </VBox>
+                        <HBox alignment="CENTER_LEFT" spacing="12">
+                          <VBox spacing="7" HBox.hgrow="ALWAYS">
+                            <Label styleClass="field-label" text="Duration" />
+                            <ComboBox maxWidth="Infinity" prefWidth="230">
+                              <items>
+                                <FXCollections fx:factory="observableArrayList">
+                                  <String fx:value="30 minutes" />
+                                  <String fx:value="45 minutes" />
+                                  <String fx:value="60 minutes" />
+                                </FXCollections>
+                              </items>
+                              <value>
+                                <String fx:value="30 minutes" />
+                              </value>
+                            </ComboBox>
+                          </VBox>
+                          <VBox spacing="7" HBox.hgrow="ALWAYS">
+                            <Label styleClass="field-label" text="Interviewer" />
+                            <TextField prefWidth="280" promptText="" text="Recruitment Team - Bright School" />
+                          </VBox>
+                        </HBox>
+                        <VBox spacing="7">
+                          <Label styleClass="field-label" text="Message to teacher" />
+                          <TextArea prefHeight="92" promptText="Interview content / preparation requests..." text="" wrapText="true" />
+                        </VBox>
+                        <HBox alignment="CENTER_LEFT" spacing="12">
+                          <Region HBox.hgrow="ALWAYS" />
+                          <Button fx:id="requestInterviewButton" styleClass="primary" text="Send interview request" />
+                        </HBox>
+                      </VBox>
+                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                        <Label styleClass="section-title" text="Track requests" />
+                        <VBox spacing="0" styleClass="table">
+                          <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
+                            <VBox alignment="CENTER_LEFT" maxWidth="210" minWidth="210" prefWidth="210" spacing="0">
+                              <Label maxWidth="194" styleClass="table-head" text="TEACHER" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="260" minWidth="260" prefWidth="260" spacing="0">
+                              <Label maxWidth="244" styleClass="table-head" text="TIME" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="250" minWidth="250" prefWidth="250" spacing="0">
+                              <Label maxWidth="234" styleClass="table-head" text="STATUS" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="250" minWidth="250" prefWidth="250" spacing="0">
+                              <Label maxWidth="234" styleClass="table-head" text="LINK" wrapText="true" />
+                            </VBox>
+                          </HBox>
+                          <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                            <VBox alignment="CENTER_LEFT" maxWidth="210" minWidth="210" prefWidth="210" spacing="0">
+                              <Label maxWidth="194" styleClass="table-text" text="Emily Martin" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="260" minWidth="260" prefWidth="260" spacing="0">
+                              <Label maxWidth="244" styleClass="table-text" text="16/10 · 14:00" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="250" minWidth="250" prefWidth="250" spacing="0">
+                              <Label styleClass="badge,badge-amber" text="Awaiting confirmation" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="250" minWidth="250" prefWidth="250" spacing="0">
+                              <Label maxWidth="234" styleClass="table-text" text="Available after schedule finalized" wrapText="true" />
+                            </VBox>
+                          </HBox>
+                          <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                            <VBox alignment="CENTER_LEFT" maxWidth="210" minWidth="210" prefWidth="210" spacing="0">
+                              <Label maxWidth="194" styleClass="table-text" text="Daniel Walker" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="260" minWidth="260" prefWidth="260" spacing="0">
+                              <Label maxWidth="244" styleClass="table-text" text="15/10 · 10:00" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="250" minWidth="250" prefWidth="250" spacing="0">
+                              <Label styleClass="badge,badge-green" text="Confirmed" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="250" minWidth="250" prefWidth="250" spacing="0">
+                              <Button fx:id="openPartnerMeetButton" styleClass="secondary" text="Open demo Meet link" />
+                            </VBox>
+                          </HBox>
+                        </VBox>
+                      </VBox>
+                    </VBox>
+                  </content>
+                </Tab>
+                <Tab text="Send Results &amp; Feedback">
+                  <content>
+                    <VBox spacing="18" styleClass="tab-body">
+                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                        <Label styleClass="section-title" text="Post-interview results" />
+                        <VBox spacing="7" HBox.hgrow="ALWAYS">
+                          <Label styleClass="field-label" text="Interview" />
+                          <ComboBox maxWidth="Infinity" prefWidth="500">
+                            <items>
+                              <FXCollections fx:factory="observableArrayList">
+                                <String fx:value="Daniel Walker · 15/10/2026" />
+                                <String fx:value="Emily Martin · 16/10/2026" />
+                              </FXCollections>
+                            </items>
+                            <value>
+                              <String fx:value="Daniel Walker · 15/10/2026" />
+                            </value>
+                          </ComboBox>
+                        </VBox>
+                        <HBox alignment="CENTER_LEFT" spacing="12">
+                          <VBox spacing="7" HBox.hgrow="ALWAYS">
+                            <Label styleClass="field-label" text="Result" />
+                            <ComboBox fx:id="interviewResult" maxWidth="Infinity" prefWidth="230">
+                              <items>
+                                <FXCollections fx:factory="observableArrayList">
+                                  <String fx:value="Proceed with Candidate" />
+                                  <String fx:value="Not Proceeding" />
+                                  <String fx:value="Require Additional Interview/ Materials" />
+                                </FXCollections>
+                              </items>
+                              <value>
+                                <String fx:value="Proceed with Candidate" />
+                              </value>
+                            </ComboBox>
+                          </VBox>
+                          <VBox spacing="7" HBox.hgrow="ALWAYS">
+                            <Label styleClass="field-label" text="Suitability" />
+                            <ComboBox maxWidth="Infinity" prefWidth="230">
+                              <items>
+                                <FXCollections fx:factory="observableArrayList">
+                                  <String fx:value="Qualified" />
+                                  <String fx:value="Under Review" />
+                                  <String fx:value="Not Qualified" />
+                                </FXCollections>
+                              </items>
+                              <value>
+                                <String fx:value="Qualified" />
+                              </value>
+                            </ComboBox>
+                          </VBox>
+                        </HBox>
+                        <VBox spacing="7">
+                          <Label styleClass="field-label" text="Comments and reasons" />
+                          <TextArea fx:id="resultComments" prefHeight="140" promptText="State suitable points, areas for improvement, and reasons for decision..." text="" wrapText="true" />
+                        </VBox>
+                        <Label maxWidth="Infinity" styleClass="note" text="Results are sent to Matching to update MatchStatusHistory and notify next steps." wrapText="true" />
+                        <HBox alignment="CENTER_LEFT" spacing="12">
+                          <Region HBox.hgrow="ALWAYS" />
+                          <Button fx:id="sendResultButton" styleClass="primary" text="Send results &amp; feedback" />
+                        </HBox>
+                      </VBox>
+                    </VBox>
+                  </content>
+                </Tab>
+              </TabPane>
+            </VBox>
+          </content>
+        </ScrollPane>
+      </center>
+    </BorderPane>
+  </center>
+</BorderPane>

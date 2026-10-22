@@ -1,0 +1,88 @@
+/* Nạp font Lato thường */
+@font-face {
+    font-family: 'Lato';
+    src: url('Lato/Lato-Regular.ttf');
+}
+
+/* Nạp font Lato in đậm (nếu có) */
+@font-face {
+    font-family: 'Lato';
+    font-weight: bold;
+    src: url('Lato/Lato-Bold.ttf');
+}
+.root { -fx-font-family: "Lato", "Segoe UI", sans-serif; -fx-font-size: 13px; -fx-background-color: #f4f7fa; -fx-text-fill: #1b2c3a;-fx-focus-color: #037EF3;-fx-faint-focus-color: #037EF333; }
+.label { -fx-text-fill: #1b2c3a; }
+.sidebar {
+    -fx-background-image: url("photo/bg_sidebar.png");
+    -fx-background-size: cover;
+    -fx-background-position: center;
+}
+.brand { -fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: white; }
+.brand-mark { -fx-background-color: #F48924; -fx-background-radius: 10; -fx-padding: 10 7; -fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #103e3b; }
+.brand-sub { -fx-font-size: 9px; -fx-text-fill: #A0C4FF; }
+.nav-caption { -fx-padding: 20 0 6 8; -fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: white; -fx-font-weight: bold;}
+.nav { -fx-alignment: CENTER_LEFT; -fx-background-color: transparent; -fx-text-fill: white; -fx-padding: 13 12; -fx-background-radius: 8; -fx-font-size: 12px; -fx-cursor: hand; -fx-font-weight: bold; }
+.nav:hover { -fx-background-color: #F85A40; }
+.nav.active { -fx-background-color: #F48924; -fx-text-fill: white; -fx-font-weight: bold;-fx-background-radius: 8; }
+.nav-foot { -fx-font-size: 10px; -fx-text-fill: white; -fx-font-weight: bold;}
+.sidebar-name { -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold; -fx-opacity: 0.8; }
+.topbar { -fx-background-color: white; -fx-padding: 16 30; -fx-border-color: transparent transparent #e4eaf0 transparent; }
+.breadcrumb { -fx-font-size: 12px; -fx-text-fill: #697a89; }
+.content { -fx-padding: 28 30 35 30; }
+.scroll-pane { -fx-background-color: transparent; -fx-background: #f4f7fa; -fx-border-color: transparent; }
+.scroll-pane > .viewport { -fx-background-color: #f4f7fa; }
+.page-title { -fx-font-size: 27px; -fx-font-weight: bold; -fx-text-fill: #1D4B7D; }
+.section-title { -fx-font-size: 16px; -fx-font-weight: bold; }
+.body { -fx-font-size: 13px; }
+.muted { -fx-text-fill: #73818d; -fx-font-size: 12px; }
+.small { -fx-text-fill: #83929d; -fx-font-size: 11px; }
+.card { -fx-background-color: white; -fx-background-radius: 12; -fx-border-radius: 12; -fx-border-color: #e2e9ee; -fx-padding: 22; }
+.metric { -fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #037EF3; }
+.badge { -fx-background-radius: 6; -fx-padding: 7 10; -fx-font-size: 10px; -fx-font-weight: bold; }
+.badge-green { -fx-background-color: #e1f4ec; -fx-text-fill: #167454; }
+.badge-amber { -fx-background-color: #fff3d8; -fx-text-fill: #996811; }
+.badge-blue { -fx-background-color: #e6effb; -fx-text-fill: #355e95; }
+.badge-gray { -fx-background-color: #edf1f5; -fx-text-fill: #667887; }
+.avatar { -fx-background-color: #e0f1e9; -fx-background-radius: 25; -fx-text-fill: #037EF3; -fx-font-size: 18px; -fx-font-weight: bold; }
+.avatar-small { -fx-background-color: #e0f1e9; -fx-background-radius: 18; -fx-text-fill: #037EF3; -fx-font-size: 12px; -fx-font-weight: bold; }
+.button { -fx-font-size: 12px; -fx-font-weight: bold; -fx-cursor: hand; -fx-padding: 11 15; -fx-background-radius: 7; -fx-border-radius: 7; }
+.primary { -fx-background-color: #037EF3; -fx-text-fill: white; -fx-border-color: #037EF3; }
+.primary:hover { -fx-background-color: #F85A40; }
+.secondary { -fx-background-color: white; -fx-text-fill: #037EF3; -fx-border-color: #d5d7e1; }
+.secondary:hover { -fx-background-color: #cfd9e4; }
+.danger { -fx-background-color: #fff1f0; -fx-text-fill: #b44d47; -fx-border-color: #f1d5d3; }
+.field-label { -fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #2C3E50; }
+.text-field, .password-field, .text-area, .combo-box, .date-picker { -fx-background-color: #fafcfd; -fx-border-color: #dce4e9; -fx-border-radius: 7; -fx-background-radius: 7; -fx-font-size: 12px; }
+.text-field, .password-field { -fx-padding: 11 12; }
+.combo-box { -fx-padding: 5 4; }
+.text-area { -fx-padding: 7; }
+.text-area .content { -fx-padding: 5; -fx-background-color: #fafcfd; }
+.text-field:focused, .text-area:focused { -fx-border-color: #037EF3; }
+.check-box { -fx-font-size: 12px; -fx-text-fill: #536a77;-fx-cursor: hand; }
+.check-box .box { -fx-background-color: white; -fx-border-color: #d5d7e1; -fx-border-radius: 4; -fx-background-radius: 4; }
+.check-box:selected .mark { -fx-background-color: #037EF3; }
+.note { -fx-padding: 13 15; -fx-background-color: #EAF4FE; -fx-background-radius: 7; -fx-font-size: 11px; -fx-text-fill: #1D4B7D; -fx-line-spacing: 3; }
+.table { -fx-border-color: #e7edf1; -fx-border-radius: 7; }
+.table-header { -fx-padding: 13 10; -fx-background-color: #f6f8fa; }
+.table-head { -fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #7b8b97; }
+.table-row { -fx-padding: 15 10; -fx-border-color: transparent transparent #edf1f4 transparent; -fx-min-height: 69; }
+.table-text { -fx-font-size: 12px; -fx-text-fill: #2C3E50; }
+.tab-pane > .tab-header-area > .tab-header-background { -fx-background-color: transparent; }
+.tab-pane .tab { -fx-background-color: #e9efed; -fx-padding: 10 18; -fx-background-radius: 7 7 0 0; }
+.tab-pane .tab:selected { -fx-background-color: white; }
+.tab-pane .tab .tab-label { -fx-font-size: 12px; -fx-text-fill: #037EF3; }
+.tab-body { -fx-padding: 20 0 0 0; }
+.video-panel { -fx-background-color: #037EF3; -fx-background-radius: 10; -fx-padding: 25; }
+.video-initial { -fx-font-size: 42px; -fx-font-weight: bold; -fx-text-fill: #99C9FF; }
+.video-caption { -fx-font-size: 11px; -fx-text-fill: #8AB4F8; }
+.login-left { -fx-background-color: #037EF3; -fx-padding: 50 55; }
+.login-right { -fx-background-color: white; -fx-padding: 50; }
+.login-hero { -fx-font-size: 44px; -fx-font-weight: bold; -fx-text-fill: white; -fx-line-spacing: 9; }
+.login-sub { -fx-font-size: 16px; -fx-text-fill: #B3D8FF; -fx-line-spacing: 8; }
+.login-feature { -fx-font-size: 14px; -fx-text-fill: #D1E8FF; }
+.avatar-emily {
+    -fx-background-image: url("photo/EM.jpg");
+    -fx-background-size: cover;
+    -fx-background-position: center;
+    -fx-background-radius: 25;
+}

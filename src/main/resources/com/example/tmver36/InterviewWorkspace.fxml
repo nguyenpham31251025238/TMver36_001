@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.String?>
+<?import javafx.collections.FXCollections?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="900" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.InterviewWorkspaceController">
+  <left>
+    <VBox minWidth="228" prefWidth="228" spacing="14" styleClass="sidebar">
+      <HBox alignment="CENTER_LEFT" spacing="12">
+        <Label styleClass="brand-mark" text="TM" />
+        <VBox spacing="3">
+          <Label styleClass="brand" text="TeacherMatch" />
+          <Label styleClass="brand-sub" text="TALENT CONNECTION" />
+        </VBox>
+      </HBox>
+      <Label styleClass="nav-caption" text="WORKSPACE / MATCHING" />
+      <Button fx:id="nav_StaffDashboard" maxWidth="Infinity" styleClass="nav" text="Teacher Profile Pool" />
+      <Button fx:id="nav_StaffReview" maxWidth="Infinity" styleClass="nav" text="Profile Review" />
+      <Button fx:id="nav_InterviewWorkspace" maxWidth="Infinity" styleClass="nav,active" text="Interviews &amp; Feedback" />
+      <Region VBox.vgrow="ALWAYS" />
+      <VBox spacing="6">
+        <Label styleClass="nav-caption" />
+        <Label styleClass="nav-foot" />
+      </VBox>
+      <HBox alignment="CENTER_LEFT" spacing="12">
+        <Label alignment="CENTER" minHeight="50" minWidth="50" styleClass="avatar" text="LA" />
+        <VBox spacing="4">
+          <Label styleClass="sidebar-name" text="Linh Anh" />
+          <Label styleClass="nav-foot" text="Matching Staff" />
+        </VBox>
+      </HBox>
+      <Button fx:id="nav_Login" maxWidth="Infinity" styleClass="nav" text="Logout" />
+    </VBox>
+  </left>
+  <center>
+    <BorderPane>
+      <top>
+        <HBox alignment="CENTER_LEFT" spacing="12" styleClass="topbar">
+          <Label styleClass="breadcrumb" text="Matching Staff / Interviews &amp; Feedback" />
+          <Region HBox.hgrow="ALWAYS" />
+          <Label styleClass="badge,badge-gray" text="DEMO" />
+          <Label styleClass="muted" text="14/10/2026" />
+          <Label alignment="CENTER" minHeight="36" minWidth="36" styleClass="avatar-small" text="LA" />
+        </HBox>
+      </top>
+      <center>
+        <ScrollPane hbarPolicy="AS_NEEDED">
+          <content>
+            <VBox spacing="22" styleClass="content">
+              <HBox alignment="CENTER_LEFT" spacing="12">
+                <VBox spacing="7">
+                  <Label styleClass="page-title" text="Interviews &amp; Feedback" />
+                  <Label styleClass="muted" text="Coordinate requests, finalize schedules, and track results from partners." wrapText="true" />
+                </VBox>
+                <Region HBox.hgrow="ALWAYS" />
+              </HBox>
+              <TabPane tabClosingPolicy="UNAVAILABLE">
+                <Tab text="Interview Coordination">
+                  <content>
+                    <VBox spacing="18" styleClass="tab-body">
+                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                        <VBox spacing="0" styleClass="table">
+                          <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
+                            <VBox alignment="CENTER_LEFT" maxWidth="400" minWidth="400" prefWidth="400" spacing="0">
+                              <Label maxWidth="384" styleClass="table-head" text="TEACHER / PARTNER" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="320" minWidth="320" prefWidth="320" spacing="0">
+                              <Label maxWidth="304" styleClass="table-head" text="TIME (UTC+7)" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="250" minWidth="250" prefWidth="250" spacing="0">
+                              <Label maxWidth="234" styleClass="table-head" text="STATUS" wrapText="true" />
+                            </VBox>
+                          </HBox>
+                          <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                            <VBox alignment="CENTER_LEFT" maxWidth="400" minWidth="400" prefWidth="400" spacing="0">
+                              <Label maxWidth="384" styleClass="table-text" text="Emily Martin · Bright School" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="320" minWidth="320" prefWidth="320" spacing="0">
+                              <Label maxWidth="304" styleClass="table-text" text="16/10 · 14:00 - 14:30" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="250" minWidth="250" prefWidth="250" spacing="0">
+                              <Label styleClass="badge,badge-amber" text="Awaiting teacher" />
+                            </VBox>
+                          </HBox>
+                          <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                            <VBox alignment="CENTER_LEFT" maxWidth="400" minWidth="400" prefWidth="400" spacing="0">
+                              <Label maxWidth="384" styleClass="table-text" text="Emily Martin · Green English" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="320" minWidth="320" prefWidth="320" spacing="0">
+                              <Label maxWidth="304" styleClass="table-text" text="20/10 · 10:00 - 10:30" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="250" minWidth="250" prefWidth="250" spacing="0">
+                              <Label styleClass="badge,badge-green" text="Confirmed" />
+                            </VBox>
+                          </HBox>
+                        </VBox>
+                      </VBox>
+                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                        <Label styleClass="section-title" text="Finalize interview" />
+                        <HBox alignment="CENTER_LEFT" spacing="12">
+                          <VBox spacing="7" HBox.hgrow="ALWAYS">
+                            <Label styleClass="field-label" text="Interview" />
+                            <ComboBox maxWidth="Infinity" prefWidth="420">
+                              <items>
+                                <FXCollections fx:factory="observableArrayList">
+                                  <String fx:value="Emily · Green English · 20/10" />
+                                </FXCollections>
+                              </items>
+                              <value>
+                                <String fx:value="Emily · Green English · 20/10" />
+                              </value>
+                            </ComboBox>
+                          </VBox>
+                          <VBox spacing="7" HBox.hgrow="ALWAYS">
+                            <Label styleClass="field-label" text="Link Meet" />
+                            <TextField fx:id="meetUrl" prefWidth="280" promptText="Paste created room link" text="" />
+                          </VBox>
+                        </HBox>
+                        <Label maxWidth="Infinity" styleClass="note" text="Only finalize schedule when the teacher has confirmed. The create room button is designed for the Google Meet integration step." wrapText="true" />
+                        <HBox alignment="CENTER_LEFT" spacing="12">
+                          <Button fx:id="createMeetButton" styleClass="secondary" text="Create Meet room (integrated)" />
+                          <Region HBox.hgrow="ALWAYS" />
+                          <Button fx:id="finalizeInterviewButton" styleClass="primary" text="Save link &amp; finalize schedule" />
+                        </HBox>
+                      </VBox>
+                    </VBox>
+                  </content>
+                </Tab>
+                <Tab text="Results &amp; Feedback">
+                  <content>
+                    <VBox spacing="18" styleClass="tab-body">
+                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                        <Label styleClass="section-title" text="Feedback from partner" />
+                        <VBox spacing="0" styleClass="table">
+                          <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
+                            <VBox alignment="CENTER_LEFT" maxWidth="240" minWidth="240" prefWidth="240" spacing="0">
+                              <Label maxWidth="224" styleClass="table-head" text="TEACHER" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="230" minWidth="230" prefWidth="230" spacing="0">
+                              <Label maxWidth="214" styleClass="table-head" text="PARTNER" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="180" minWidth="180" prefWidth="180" spacing="0">
+                              <Label maxWidth="164" styleClass="table-head" text="DECISION" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="320" minWidth="320" prefWidth="320" spacing="0">
+                              <Label maxWidth="304" styleClass="table-head" text="COMMENTS" wrapText="true" />
+                            </VBox>
+                          </HBox>
+                          <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                            <VBox alignment="CENTER_LEFT" maxWidth="240" minWidth="240" prefWidth="240" spacing="0">
+                              <Label maxWidth="224" styleClass="table-text" text="Daniel Walker" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="230" minWidth="230" prefWidth="230" spacing="0">
+                              <Label maxWidth="214" styleClass="table-text" text="Bright School" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="180" minWidth="180" prefWidth="180" spacing="0">
+                              <Label styleClass="badge,badge-green" text="Proceed" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="320" minWidth="320" prefWidth="320" spacing="0">
+                              <Label maxWidth="304" styleClass="table-text" text="Clear pronunciation; suggest contract discussion." wrapText="true" />
+                            </VBox>
+                          </HBox>
+                          <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                            <VBox alignment="CENTER_LEFT" maxWidth="240" minWidth="240" prefWidth="240" spacing="0">
+                              <Label maxWidth="224" styleClass="table-text" text="Sarah Thompson" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="230" minWidth="230" prefWidth="230" spacing="0">
+                              <Label maxWidth="214" styleClass="table-text" text="Sunrise Academy" wrapText="true" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="180" minWidth="180" prefWidth="180" spacing="0">
+                              <Label styleClass="badge,badge-gray" text="Do not proceed" />
+                            </VBox>
+                            <VBox alignment="CENTER_LEFT" maxWidth="320" minWidth="320" prefWidth="320" spacing="0">
+                              <Label maxWidth="304" styleClass="table-text" text="Not suitable for teaching schedule." wrapText="true" />
+                            </VBox>
+                          </HBox>
+                        </VBox>
+                      </VBox>
+                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                        <Label styleClass="section-title" text="Track profile post-interview" />
+                        <VBox spacing="7" HBox.hgrow="ALWAYS">
+                          <Label styleClass="field-label" text="Next stage" />
+                          <ComboBox maxWidth="Infinity" prefWidth="230">
+                            <items>
+                              <FXCollections fx:factory="observableArrayList">
+                                <String fx:value="Interviewed" />
+                                <String fx:value="Awaiting Results" />
+                                <String fx:value="Accepted" />
+                                <String fx:value="Rejected" />
+                              </FXCollections>
+                            </items>
+                            <value>
+                              <String fx:value="Awaiting Results" />
+                            </value>
+                          </ComboBox>
+                        </VBox>
+                        <Button fx:id="updateHistoryButton" styleClass="primary" text="Update connection history" />
+                      </VBox>
+                    </VBox>
+                  </content>
+                </Tab>
+              </TabPane>
+            </VBox>
+          </content>
+        </ScrollPane>
+      </center>
+    </BorderPane>
+  </center>
+</BorderPane>

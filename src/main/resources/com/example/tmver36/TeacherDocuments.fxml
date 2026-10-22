@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.String?>
+<?import javafx.collections.FXCollections?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="900" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.TeacherDocumentsController">
+  <left>
+    <VBox minWidth="228" prefWidth="228" spacing="14" styleClass="sidebar">
+      <HBox alignment="CENTER_LEFT" spacing="12">
+        <Label styleClass="brand-mark" text="TM" />
+        <VBox spacing="3">
+          <Label styleClass="brand" text="TeacherMatch" />
+          <Label styleClass="brand-sub" text="TALENT CONNECTION" />
+        </VBox>
+      </HBox>
+      <Label styleClass="nav-caption" text="WORKSPACE / TEACHER" />
+      <Button fx:id="nav_TeacherProfile" maxWidth="Infinity" styleClass="nav" text="My Profile" />
+      <Button fx:id="nav_TeacherDocuments" maxWidth="Infinity" styleClass="nav,active" text="CV &amp; Documents" />
+      <Button fx:id="nav_TeacherSchedule" maxWidth="Infinity" styleClass="nav" text="Availability &amp; Interviews" />
+      <Button fx:id="nav_TeacherHistory" maxWidth="Infinity" styleClass="nav" text="Connection Status" />
+      <Region VBox.vgrow="ALWAYS" />
+      <VBox spacing="6" />
+      <HBox alignment="CENTER_LEFT" spacing="12">
+        <Label alignment="CENTER" minHeight="50" minWidth="50" styleClass="avatar" text="EM" />
+        <VBox spacing="4">
+          <Label styleClass="sidebar-name" text="Emily Martin" />
+          <Label styleClass="nav-foot" text="Teacher" />
+        </VBox>
+      </HBox>
+      <Button fx:id="nav_Login" maxWidth="Infinity" styleClass="nav" text="Logout" />
+    </VBox>
+  </left>
+  <center>
+    <BorderPane>
+      <top>
+        <HBox alignment="CENTER_LEFT" spacing="12" styleClass="topbar">
+          <Label styleClass="breadcrumb" text="Giáo viên / CV &amp; Documents" />
+          <Region HBox.hgrow="ALWAYS" />
+          <Label styleClass="badge,badge-gray" text="DEMO" />
+          <Label styleClass="muted" text="14/10/2026" />
+          <Label alignment="CENTER" minHeight="36" minWidth="36" styleClass="avatar-small" text="EM" />
+        </HBox>
+      </top>
+      <center>
+        <ScrollPane hbarPolicy="AS_NEEDED">
+          <content>
+            <VBox spacing="22" styleClass="content">
+              <HBox alignment="CENTER_LEFT" spacing="12">
+                <VBox spacing="7">
+                  <Label styleClass="page-title" text="CV &amp; Documents" />
+                  <Label styleClass="muted" text="Add CV, certificates, and videos for partners to evaluate profile." wrapText="true" />
+                           <Label layoutX="10.0" layoutY="51.0" styleClass="muted" text="Note: Ensure your CV does not contain personal contact details or external links." textFill="RED" wrapText="true" />
+                </VBox>
+                <Region HBox.hgrow="ALWAYS" />
+              </HBox>
+              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                <Label styleClass="section-title" text="Add document" />
+                <HBox alignment="CENTER_LEFT" spacing="12">
+                  <VBox spacing="7" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Document type" />
+                    <ComboBox fx:id="documentType" maxWidth="Infinity" prefWidth="230">
+                      <items>
+                        <FXCollections fx:factory="observableArrayList">
+                          <String fx:value="CV" />
+                          <String fx:value="Certificates" />
+                          <String fx:value="Intro video" />
+                          <String fx:value="Teaching video" />
+                        </FXCollections>
+                      </items>
+                      <value>
+                        <String fx:value="CV" />
+                      </value>
+                    </ComboBox>
+                  </VBox>
+                  <VBox spacing="7" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Document name" />
+                    <TextField fx:id="documentName" prefWidth="280" promptText="Example: CV - Emily Martin" text="" />
+                  </VBox>
+                </HBox>
+                <HBox alignment="CENTER_LEFT" spacing="12">
+                  <Button fx:id="chooseFileButton" styleClass="secondary" text="Choose file from device" />
+                  <VBox spacing="7" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Or document URL" />
+                    <TextField fx:id="documentUrl" prefWidth="280" promptText="https://…" text="" />
+                  </VBox>
+                </HBox>
+                <Label maxWidth="Infinity" styleClass="note" text="The deployed version needs to validate file type, size, and link access before saving." wrapText="true" />
+                <HBox alignment="CENTER_LEFT" spacing="12">
+                  <Region HBox.hgrow="ALWAYS" />
+                  <Button fx:id="addDocumentButton" styleClass="primary" text="Add document" />
+                </HBox>
+              </VBox>
+              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                <Label styleClass="section-title" text="Documents in profile" />
+                <VBox spacing="0" styleClass="table">
+                  <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
+                    <VBox alignment="CENTER_LEFT" maxWidth="350" minWidth="350" prefWidth="350" spacing="0">
+                      <Label maxWidth="334" styleClass="table-head" text="DOCUMENT" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="200" minWidth="200" prefWidth="200" spacing="0">
+                      <Label maxWidth="184" styleClass="table-head" text="TYPE" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="160" minWidth="160" prefWidth="160" spacing="0">
+                      <Label maxWidth="144" styleClass="table-head" text="UPDATED" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="270" minWidth="270" prefWidth="270" spacing="0">
+                      <Label maxWidth="254" styleClass="table-head" text="ACTION" wrapText="true" />
+                    </VBox>
+                  </HBox>
+                  <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                    <VBox alignment="CENTER_LEFT" maxWidth="350" minWidth="350" prefWidth="350" spacing="0">
+                      <Label maxWidth="334" styleClass="table-text" text="Emily_Martin_CV.pdf" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="200" minWidth="200" prefWidth="200" spacing="0">
+                      <Label maxWidth="184" styleClass="table-text" text="CV" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="160" minWidth="160" prefWidth="160" spacing="0">
+                      <Label maxWidth="144" styleClass="table-text" text="14/10/2026" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="270" minWidth="270" prefWidth="270" spacing="0">
+                      <HBox alignment="CENTER_LEFT" spacing="12">
+                        <Button fx:id="viewCvButton" styleClass="secondary" text="View" />
+                        <Button fx:id="deleteCvButton" styleClass="danger" text="Delete" />
+                      </HBox>
+                    </VBox>
+                  </HBox>
+                  <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                    <VBox alignment="CENTER_LEFT" maxWidth="350" minWidth="350" prefWidth="350" spacing="0">
+                      <Label maxWidth="334" styleClass="table-text" text="CELTA_Certificate.pdf" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="200" minWidth="200" prefWidth="200" spacing="0">
+                      <Label maxWidth="184" styleClass="table-text" text="Certificates" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="160" minWidth="160" prefWidth="160" spacing="0">
+                      <Label maxWidth="144" styleClass="table-text" text="14/10/2026" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="270" minWidth="270" prefWidth="270" spacing="0">
+                      <Button fx:id="viewCertificateButton" styleClass="secondary" text="View" />
+                    </VBox>
+                  </HBox>
+                  <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                    <VBox alignment="CENTER_LEFT" maxWidth="350" minWidth="350" prefWidth="350" spacing="0">
+                      <Label maxWidth="334" styleClass="table-text" text="Introduction_Emily.mp4" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="200" minWidth="200" prefWidth="200" spacing="0">
+                      <Label maxWidth="184" styleClass="table-text" text="Intro video" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="160" minWidth="160" prefWidth="160" spacing="0">
+                      <Label maxWidth="144" styleClass="table-text" text="14/10/2026" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="270" minWidth="270" prefWidth="270" spacing="0">
+                      <Button fx:id="viewIntroButton" styleClass="secondary" text="Watch video" />
+                    </VBox>
+                  </HBox>
+                  <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                    <VBox alignment="CENTER_LEFT" maxWidth="350" minWidth="350" prefWidth="350" spacing="0">
+                      <Label maxWidth="334" styleClass="table-text" text="Teaching_Demo.mp4" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="200" minWidth="200" prefWidth="200" spacing="0">
+                      <Label maxWidth="184" styleClass="table-text" text="Teaching video" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="160" minWidth="160" prefWidth="160" spacing="0">
+                      <Label maxWidth="144" styleClass="table-text" text="14/10/2026" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="270" minWidth="270" prefWidth="270" spacing="0">
+                      <Button fx:id="viewDemoButton" styleClass="secondary" text="Watchi video" />
+                    </VBox>
+                  </HBox>
+                </VBox>
+              </VBox>
+            </VBox>
+          </content>
+        </ScrollPane>
+      </center>
+    </BorderPane>
+  </center>
+</BorderPane>

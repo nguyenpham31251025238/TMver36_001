@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.String?>
+<?import javafx.collections.FXCollections?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="900" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.StaffDashboardController">
+  <left>
+    <VBox minWidth="228" prefWidth="228" spacing="14" styleClass="sidebar">
+      <HBox alignment="CENTER_LEFT" spacing="12">
+        <Label styleClass="brand-mark" text="TM" />
+        <VBox spacing="3">
+          <Label styleClass="brand" text="TeacherMatch" />
+          <Label styleClass="brand-sub" text="TALENT CONNECTION" />
+        </VBox>
+      </HBox>
+      <Label styleClass="nav-caption" text="WORKSPACE / MATCHING" />
+      <Button fx:id="nav_StaffDashboard" maxWidth="Infinity" styleClass="nav,active" text="Teacher Profile Pool" />
+      <Button fx:id="nav_StaffReview" maxWidth="Infinity" styleClass="nav" text="Profile Review" />
+      <Button fx:id="nav_InterviewWorkspace" maxWidth="Infinity" styleClass="nav" text="Interviews &amp; Feedback" />
+      <Region VBox.vgrow="ALWAYS" />
+      <HBox alignment="CENTER_LEFT" spacing="12">
+        <Label alignment="CENTER" minHeight="50" minWidth="50" styleClass="avatar" text="LA" />
+        <VBox spacing="4">
+          <Label styleClass="sidebar-name" text="Linh Anh" />
+          <Label styleClass="nav-foot" text="Matching Staff" />
+        </VBox>
+      </HBox>
+      <Button fx:id="nav_Login" maxWidth="Infinity" styleClass="nav" text="Logout" />
+    </VBox>
+  </left>
+  <center>
+    <BorderPane>
+      <top>
+        <HBox alignment="CENTER_LEFT" spacing="12" styleClass="topbar">
+          <Label styleClass="breadcrumb" text="Matching Staff / Teacher Profile Pool" />
+          <Region HBox.hgrow="ALWAYS" />
+          <Label styleClass="badge,badge-gray" text="DEMO" />
+          <Label styleClass="muted" text="14/10/2026" />
+          <Label alignment="CENTER" minHeight="36" minWidth="36" styleClass="avatar-small" text="LA" />
+        </HBox>
+      </top>
+      <center>
+        <ScrollPane hbarPolicy="AS_NEEDED">
+          <content>
+            <VBox spacing="22" styleClass="content">
+              <HBox alignment="CENTER_LEFT" spacing="12">
+                <VBox spacing="7">
+                  <Label styleClass="page-title" text="Teacher Profile Pool" />
+                  <Label styleClass="muted" text="Find suitable candidates and manage profiles before sharing with partners." wrapText="true" />
+                </VBox>
+                <Region HBox.hgrow="ALWAYS" />
+                <Button fx:id="nav_StaffReview__2" styleClass="primary" text="Profile Review" />
+              </HBox>
+              <HBox alignment="CENTER_LEFT" spacing="12">
+                <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                  <Label styleClass="muted" text="Ready profiles" />
+                  <Label styleClass="metric" text="24" />
+                </VBox>
+                <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                  <Label styleClass="muted" text="Pending profiles" />
+                  <Label styleClass="metric" text="06" />
+                </VBox>
+                <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                  <Label styleClass="muted" text="Interview requests" />
+                  <Label styleClass="metric" text="03" />
+                  <Label styleClass="small" />
+                </VBox>
+              </HBox>
+              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                <HBox alignment="CENTER_LEFT" spacing="12">
+                  <VBox spacing="7" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Search teachers" />
+                    <TextField fx:id="profileSearch" prefWidth="280" promptText="Name, skills, location..." text="" />
+                  </VBox>
+                  <VBox spacing="7" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Nationality" />
+                    <ComboBox maxWidth="Infinity" prefWidth="230">
+                      <items>
+                        <FXCollections fx:factory="observableArrayList">
+                          <String fx:value="All" />
+                          <String fx:value="United Kingdom" />
+                          <String fx:value="Canada" />
+                          <String fx:value="Australia" />
+                        </FXCollections>
+                      </items>
+                      <value>
+                        <String fx:value="All" />
+                      </value>
+                    </ComboBox>
+                  </VBox>
+                  <VBox spacing="7" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Status" />
+                    <ComboBox maxWidth="Infinity" prefWidth="230">
+                      <items>
+                        <FXCollections fx:factory="observableArrayList">
+                          <String fx:value="All" />
+                          <String fx:value="Pending" />
+                          <String fx:value="Ready" />
+                          <String fx:value="Update Required" />
+                        </FXCollections>
+                      </items>
+                      <value>
+                        <String fx:value="All" />
+                      </value>
+                    </ComboBox>
+                  </VBox>
+                </HBox>
+                <HBox alignment="CENTER_LEFT" spacing="12">
+                  <VBox spacing="7" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Experience" />
+                    <ComboBox maxWidth="Infinity" prefWidth="230">
+                      <items>
+                        <FXCollections fx:factory="observableArrayList">
+                          <String fx:value="All" />
+                          <String fx:value="0 - 2 years" />
+                          <String fx:value="3 - 5 years" />
+                          <String fx:value="Over 5 years" />
+                        </FXCollections>
+                      </items>
+                      <value>
+                        <String fx:value="All" />
+                      </value>
+                    </ComboBox>
+                  </VBox>
+                  <VBox spacing="7" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Certificates" />
+                    <ComboBox maxWidth="Infinity" prefWidth="230">
+                      <items>
+                        <FXCollections fx:factory="observableArrayList">
+                          <String fx:value="All" />
+                          <String fx:value="CELTA" />
+                          <String fx:value="TEFL" />
+                          <String fx:value="TESOL" />
+                        </FXCollections>
+                      </items>
+                      <value>
+                        <String fx:value="All" />
+                      </value>
+                    </ComboBox>
+                  </VBox>
+                  <VBox spacing="7" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Location" />
+                    <ComboBox maxWidth="Infinity" prefWidth="230">
+                      <items>
+                        <FXCollections fx:factory="observableArrayList">
+                          <String fx:value="All" />
+                          <String fx:value="Hanoi" />
+                          <String fx:value="Danang" />
+                          <String fx:value="HCM City" />
+                        </FXCollections>
+                      </items>
+                      <value>
+                        <String fx:value="All" />
+                      </value>
+                    </ComboBox>
+                  </VBox>
+                  <VBox spacing="7" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Expected Salary" />
+                    <ComboBox maxWidth="Infinity" prefWidth="230">
+                      <items>
+                        <FXCollections fx:factory="observableArrayList">
+                          <String fx:value="All" />
+                          <String fx:value="$800 - $1,000 / month" />
+                          <String fx:value="$1,000 - $1,200 / month" />
+                          <String fx:value="Over $1,200 / month" />
+                        </FXCollections>
+                      </items>
+                      <value>
+                        <String fx:value="All" />
+                      </value>
+                    </ComboBox>
+                  </VBox>
+                  <Button fx:id="filterProfilesButton" styleClass="primary" text="Filter profiles" />
+                </HBox>
+              </VBox>
+              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                <HBox alignment="CENTER_LEFT" spacing="12">
+                  <Label styleClass="section-title" text="Candidate list" />
+                  <Region HBox.hgrow="ALWAYS" />
+                  <Label styleClass="muted" text="4 mock profiles" />
+                </HBox>
+                <VBox spacing="0" styleClass="table">
+                  <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
+                    <VBox alignment="CENTER_LEFT" maxWidth="260" minWidth="260" prefWidth="260" spacing="0">
+                      <Label maxWidth="244" styleClass="table-head" text="TEACHER" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="190" minWidth="190" prefWidth="190" spacing="0">
+                      <Label maxWidth="174" styleClass="table-head" text="NATIONALITY" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="155" minWidth="155" prefWidth="155" spacing="0">
+                      <Label maxWidth="139" styleClass="table-head" text="EXPERIENCE" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="185" minWidth="185" prefWidth="185" spacing="0">
+                      <Label maxWidth="169" styleClass="table-head" text="STATUS" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="190" minWidth="190" prefWidth="190" spacing="0">
+                      <Label maxWidth="174" styleClass="table-head" text="ACTION" wrapText="true" />
+                    </VBox>
+                  </HBox>
+                  <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                    <VBox alignment="CENTER_LEFT" maxWidth="260" minWidth="260" prefWidth="260" spacing="0">
+                      <Label maxWidth="244" styleClass="table-text" text="Emily Martin CELTA · Hanoi" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="190" minWidth="190" prefWidth="190" spacing="0">
+                      <Label maxWidth="174" styleClass="table-text" text="United Kingdom" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="155" minWidth="155" prefWidth="155" spacing="0">
+                      <Label maxWidth="139" styleClass="table-text" text="4 years" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="185" minWidth="185" prefWidth="185" spacing="0">
+                      <Label styleClass="badge,badge-amber" text="Pending" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="190" minWidth="190" prefWidth="190" spacing="0">
+                      <Button fx:id="nav_StaffReview__3" styleClass="primary" text="Review" />
+                    </VBox>
+                  </HBox>
+                  <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                    <VBox alignment="CENTER_LEFT" maxWidth="260" minWidth="260" prefWidth="260" spacing="0">
+                      <Label maxWidth="244" styleClass="table-text" text="Daniel Walker TEFL · Danang" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="190" minWidth="190" prefWidth="190" spacing="0">
+                      <Label maxWidth="174" styleClass="table-text" text="Canada" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="155" minWidth="155" prefWidth="155" spacing="0">
+                      <Label maxWidth="139" styleClass="table-text" text="6 years" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="185" minWidth="185" prefWidth="185" spacing="0">
+                      <Label styleClass="badge,badge-green" text="Ready" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="190" minWidth="190" prefWidth="190" spacing="0">
+                      <Button fx:id="nav_StaffAccess__2" styleClass="secondary" text="Grant access" />
+                    </VBox>
+                  </HBox>
+                  <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                    <VBox alignment="CENTER_LEFT" maxWidth="260" minWidth="260" prefWidth="260" spacing="0">
+                      <Label maxWidth="244" styleClass="table-text" text="Sarah Thompson TESOL · HCM City" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="190" minWidth="190" prefWidth="190" spacing="0">
+                      <Label maxWidth="174" styleClass="table-text" text="Australia" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="155" minWidth="155" prefWidth="155" spacing="0">
+                      <Label maxWidth="139" styleClass="table-text" text="3 years" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="185" minWidth="185" prefWidth="185" spacing="0">
+                      <Label styleClass="badge,badge-green" text="Ready" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="190" minWidth="190" prefWidth="190" spacing="0">
+                      <Button fx:id="nav_PartnerProfile" styleClass="secondary" text="View profile" />
+                    </VBox>
+                  </HBox>
+                  <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                    <VBox alignment="CENTER_LEFT" maxWidth="260" minWidth="260" prefWidth="260" spacing="0">
+                      <Label maxWidth="244" styleClass="table-text" text="James Miller TEFL · Hanoi" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="190" minWidth="190" prefWidth="190" spacing="0">
+                      <Label maxWidth="174" styleClass="table-text" text="United Kingdom" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="155" minWidth="155" prefWidth="155" spacing="0">
+                      <Label maxWidth="139" styleClass="table-text" text="2 years" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="185" minWidth="185" prefWidth="185" spacing="0">
+                      <Label styleClass="badge,badge-blue" text="Update Required" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="190" minWidth="190" prefWidth="190" spacing="0">
+                      <Button fx:id="nav_StaffReview__4" styleClass="secondary" text="View profile" />
+                    </VBox>
+                  </HBox>
+                </VBox>
+              </VBox>
+            </VBox>
+          </content>
+        </ScrollPane>
+      </center>
+    </BorderPane>
+  </center>
+</BorderPane>

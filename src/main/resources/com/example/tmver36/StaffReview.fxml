@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="900" prefWidth="1360" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.StaffReviewController">
+  <left>
+    <VBox minWidth="228" prefWidth="228" spacing="14" styleClass="sidebar">
+      <HBox alignment="CENTER_LEFT" spacing="12">
+        <Label styleClass="brand-mark" text="TM" />
+        <VBox spacing="3">
+          <Label styleClass="brand" text="TeacherMatch" />
+          <Label styleClass="brand-sub" text="TALENT CONNECTION" />
+        </VBox>
+      </HBox>
+      <Label styleClass="nav-caption" text="WORKSPACE / MATCHING" />
+      <Button fx:id="nav_StaffDashboard" maxWidth="Infinity" styleClass="nav" text="Teacher Profile Pool" />
+      <Button fx:id="nav_StaffReview" maxWidth="Infinity" styleClass="nav,active" text="Profile Review" />
+      <Button fx:id="nav_InterviewWorkspace" maxWidth="Infinity" styleClass="nav" text="Interviews &amp; Feedback" />
+      <Region VBox.vgrow="ALWAYS" />
+      <VBox spacing="6" />
+      <HBox alignment="CENTER_LEFT" spacing="12">
+        <Label alignment="CENTER" minHeight="50" minWidth="50" styleClass="avatar" text="LA" />
+        <VBox spacing="4">
+          <Label styleClass="sidebar-name" text="Linh Anh" />
+          <Label styleClass="nav-foot" text="Matching Staff" />
+        </VBox>
+      </HBox>
+      <Button fx:id="nav_Login" maxWidth="Infinity" styleClass="nav" text="Logout" />
+    </VBox>
+  </left>
+  <center>
+    <BorderPane>
+      <top>
+        <HBox alignment="CENTER_LEFT" spacing="12" styleClass="topbar">
+          <Label styleClass="breadcrumb" text="Matching Staff / Profile Review" />
+          <Region HBox.hgrow="ALWAYS" />
+          <Label styleClass="badge,badge-gray" text="DEMO" />
+          <Label styleClass="muted" text="14/10/2026" />
+          <Label alignment="CENTER" minHeight="36" minWidth="36" styleClass="avatar-small" text="LA" />
+        </HBox>
+      </top>
+      <center>
+        <ScrollPane fitToWidth="true" hbarPolicy="NEVER">
+          <content>
+            <VBox spacing="22" styleClass="content">
+              <HBox alignment="CENTER_LEFT" spacing="12">
+                <VBox spacing="7">
+                  <Label styleClass="page-title" text="Profile Review" />
+                  <Label styleClass="muted" text="Verify information and documents before marking ready for introduction." wrapText="true" />
+                </VBox>
+                <Region HBox.hgrow="ALWAYS" />
+              </HBox>
+              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                <HBox alignment="CENTER_LEFT" spacing="12">
+                  <Label minHeight="50" minWidth="50" prefHeight="50" prefWidth="50" styleClass="avatar-emily" />
+                  <VBox spacing="5">
+                    <Label styleClass="section-title" text="Emily Martin" />
+                    <Label styleClass="muted" text="United Kingdom · 4 years · CELTA · Hanoi" />
+                  </VBox>
+                  <Region HBox.hgrow="ALWAYS" />
+                  <Label styleClass="badge,badge-amber" text="Pending review" />
+                </HBox>
+              </VBox>
+              <HBox alignment="CENTER_LEFT" spacing="12">
+                <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                  <Label styleClass="section-title" text="Information &amp; Documents" />
+                  <Label styleClass="body" text="Preference: Primary · Start date 01/12/2026" />
+                  <VBox spacing="7">
+                    <Label styleClass="field-label" text="Introduction" />
+                    <TextArea prefHeight="92" promptText="" text="Experienced primary English teacher. CELTA certified." wrapText="true" />
+                  </VBox>
+                  <VBox spacing="0" styleClass="table">
+                    <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
+                      <VBox alignment="CENTER_LEFT" maxWidth="350" minWidth="350" prefWidth="350" spacing="0">
+                        <Label maxWidth="334" styleClass="table-head" text="DOCUMENT" wrapText="true" />
+                      </VBox>
+                      <VBox alignment="CENTER_LEFT" maxWidth="180" minWidth="180" prefWidth="180" spacing="0">
+                        <Label maxWidth="164" styleClass="table-head" text="ACTION" wrapText="true" />
+                      </VBox>
+                    </HBox>
+                    <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                      <VBox alignment="CENTER_LEFT" maxWidth="350" minWidth="350" prefWidth="350" spacing="0">
+                        <Label maxWidth="334" styleClass="table-text" text="CV · Emily_Martin.pdf" wrapText="true" />
+                      </VBox>
+                      <VBox alignment="CENTER_LEFT" maxWidth="180" minWidth="180" prefWidth="180" spacing="0">
+                        <Button fx:id="reviewCvButton" styleClass="secondary" text="Open CV" />
+                      </VBox>
+                    </HBox>
+                    <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                      <VBox alignment="CENTER_LEFT" maxWidth="350" minWidth="350" prefWidth="350" spacing="0">
+                        <Label maxWidth="334" styleClass="table-text" text="Certificate · CELTA.pdf" wrapText="true" />
+                      </VBox>
+                      <VBox alignment="CENTER_LEFT" maxWidth="180" minWidth="180" prefWidth="180" spacing="0">
+                        <Button fx:id="reviewCertButton" styleClass="secondary" text="Open File" />
+                      </VBox>
+                    </HBox>
+                    <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                      <VBox alignment="CENTER_LEFT" maxWidth="350" minWidth="350" prefWidth="350" spacing="0">
+                        <Label maxWidth="334" styleClass="table-text" text="Intro video" wrapText="true" />
+                      </VBox>
+                      <VBox alignment="CENTER_LEFT" maxWidth="180" minWidth="180" prefWidth="180" spacing="0">
+                        <Button fx:id="reviewIntroButton" styleClass="secondary" text="Watch Video" />
+                      </VBox>
+                    </HBox>
+                    <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                      <VBox alignment="CENTER_LEFT" maxWidth="350" minWidth="350" prefWidth="350" spacing="0">
+                        <Label maxWidth="334" styleClass="table-text" text="Teaching video" wrapText="true" />
+                      </VBox>
+                      <VBox alignment="CENTER_LEFT" maxWidth="180" minWidth="180" prefWidth="180" spacing="0">
+                        <Button fx:id="reviewDemoButton" styleClass="secondary" text="Watch Video" />
+                      </VBox>
+                    </HBox>
+                  </VBox>
+                </VBox>
+                <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                  <Label styleClass="section-title" text="Review checklist" />
+                  <CheckBox selected="true" text="Complete personal information" />
+                  <CheckBox selected="true" text="Readable and consistent CV" />
+                  <CheckBox selected="true" text="Viewable certificates" />
+                  <CheckBox text="Viewable intro / teaching video" />
+                  <CheckBox text="Declared interview time slots" />
+                  <VBox spacing="7">
+                    <Label styleClass="field-label" text="Comments to teacher" />
+                    <TextArea prefHeight="92" promptText="Specify missing information..." text="" wrapText="true" />
+                  </VBox>
+                  <Button fx:id="requestChangesButton" maxWidth="Infinity" styleClass="secondary" text="Request update" />
+                  <Button fx:id="readyStatusButton" maxWidth="Infinity" styleClass="primary" text="Mark as ready" />
+                </VBox>
+              </HBox>
+            </VBox>
+          </content>
+        </ScrollPane>
+      </center>
+    </BorderPane>
+  </center>
+</BorderPane>

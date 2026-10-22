@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.String?>
+<?import javafx.collections.FXCollections?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.DatePicker?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="900" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.AdminLogsController">
+  <left>
+    <VBox minWidth="228" prefWidth="228" spacing="14" styleClass="sidebar">
+      <HBox alignment="CENTER_LEFT" spacing="12">
+        <Label styleClass="brand-mark" text="TM" />
+        <VBox spacing="3">
+          <Label styleClass="brand" text="TeacherMatch" />
+          <Label styleClass="brand-sub" text="TALENT CONNECTION" />
+        </VBox>
+      </HBox>
+      <Label styleClass="nav-caption" text="WORKSPACE / ADMIN" />
+      <Button fx:id="nav_AdminAccounts" maxWidth="Infinity" styleClass="nav" text="Accounts &amp; Permissions" />
+      <Button fx:id="nav_AdminLogs" maxWidth="Infinity" styleClass="nav,active" text="System Logs" />
+      <Region VBox.vgrow="ALWAYS" />
+      <VBox spacing="6">
+        <Label styleClass="nav-caption" />
+        <Label styleClass="nav-foot" />
+      </VBox>
+      <HBox alignment="CENTER_LEFT" spacing="12">
+        <Label alignment="CENTER" minHeight="50" minWidth="50" styleClass="avatar" text="AD" />
+        <VBox spacing="4">
+          <Label styleClass="sidebar-name" text="Administrator" />
+          <Label styleClass="nav-foot" text="System Admin" />
+        </VBox>
+      </HBox>
+      <Button fx:id="nav_Login" maxWidth="Infinity" styleClass="nav" text="Logout" />
+    </VBox>
+  </left>
+  <center>
+    <BorderPane>
+      <top>
+        <HBox alignment="CENTER_LEFT" spacing="12" styleClass="topbar">
+          <Label styleClass="breadcrumb" text="System Admin / System Logs" />
+          <Region HBox.hgrow="ALWAYS" />
+          <Label styleClass="badge,badge-gray" text="DEMO" />
+          <Label styleClass="muted" text="14/10/2026" />
+          <Label alignment="CENTER" minHeight="36" minWidth="36" styleClass="avatar-small" text="AD" />
+        </HBox>
+      </top>
+      <center>
+        <ScrollPane hbarPolicy="AS_NEEDED">
+          <content>
+            <VBox spacing="22" styleClass="content">
+              <HBox alignment="CENTER_LEFT" spacing="12">
+                <VBox spacing="7">
+                  <Label styleClass="page-title" text="System Logs" />
+                  <Label styleClass="muted" text="Lookup account activities, profile sharing, and system errors." wrapText="true" />
+                </VBox>
+                <Region HBox.hgrow="ALWAYS" />
+              </HBox>
+              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                <HBox alignment="CENTER_LEFT" spacing="12">
+                  <VBox spacing="7" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Search in logs" />
+                    <TextField fx:id="logSearch" prefWidth="280" promptText="Account, action, profile..." text="" />
+                  </VBox>
+                  <VBox spacing="7" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Level" />
+                    <ComboBox maxWidth="Infinity" prefWidth="230" promptText="AllA">
+                      <items>
+                        <FXCollections fx:factory="observableArrayList">
+                          <String fx:value="ALL" />
+                          <String fx:value="INFO" />
+                          <String fx:value="WARN" />
+                          <String fx:value="ERROR" />
+                        </FXCollections>
+                      </items>
+                      <value>
+                        <String fx:value="ALL" />
+                      </value>
+                    </ComboBox>
+                  </VBox>
+                  <VBox spacing="7">
+                    <Label styleClass="field-label" text="Date" />
+                    <DatePicker fx:id="logDate" promptText="Select date" />
+                  </VBox>
+                  <Button fx:id="searchLogsButton" styleClass="primary" text="Search" />
+                </HBox>
+              </VBox>
+              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                <Label styleClass="section-title" text="Recent Activities" />
+                <VBox spacing="0" styleClass="table">
+                  <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
+                    <VBox alignment="CENTER_LEFT" maxWidth="160" minWidth="160" prefWidth="160" spacing="0">
+                      <Label maxWidth="144" styleClass="table-head" text="TIME" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="130" minWidth="130" prefWidth="130" spacing="0">
+                      <Label maxWidth="114" styleClass="table-head" text="LEVEL" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="200" minWidth="200" prefWidth="200" spacing="0">
+                      <Label maxWidth="184" styleClass="table-head" text="USER" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="490" minWidth="490" prefWidth="490" spacing="0">
+                      <Label maxWidth="474" styleClass="table-head" text="EVENT" wrapText="true" />
+                    </VBox>
+                  </HBox>
+                  <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                    <VBox alignment="CENTER_LEFT" maxWidth="160" minWidth="160" prefWidth="160" spacing="0">
+                      <Label maxWidth="144" styleClass="table-text" text="14/10 · 11:45" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="130" minWidth="130" prefWidth="130" spacing="0">
+                      <Label styleClass="badge,badge-blue" text="INFO" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="200" minWidth="200" prefWidth="200" spacing="0">
+                      <Label maxWidth="184" styleClass="table-text" text="matching@example.com" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="490" minWidth="490" prefWidth="490" spacing="0">
+                      <Label maxWidth="474" styleClass="table-text" text="INTERVIEW_CONFIRMED · Emily / Green English" wrapText="true" />
+                    </VBox>
+                  </HBox>
+                  <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                    <VBox alignment="CENTER_LEFT" maxWidth="160" minWidth="160" prefWidth="160" spacing="0">
+                      <Label maxWidth="144" styleClass="table-text" text="14/10 · 11:10" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="130" minWidth="130" prefWidth="130" spacing="0">
+                      <Label styleClass="badge,badge-blue" text="INFO" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="200" minWidth="200" prefWidth="200" spacing="0">
+                      <Label maxWidth="184" styleClass="table-text" text="hr@example.com" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="490" minWidth="490" prefWidth="490" spacing="0">
+                      <Label maxWidth="474" styleClass="table-text" text="INTERVIEW_REQUESTED · Emily / Bright School" wrapText="true" />
+                    </VBox>
+                  </HBox>
+                  <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                    <VBox alignment="CENTER_LEFT" maxWidth="160" minWidth="160" prefWidth="160" spacing="0">
+                      <Label maxWidth="144" styleClass="table-text" text="14/10 · 10:30" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="130" minWidth="130" prefWidth="130" spacing="0">
+                      <Label styleClass="badge,badge-blue" text="INFO" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="200" minWidth="200" prefWidth="200" spacing="0">
+                      <Label maxWidth="184" styleClass="table-text" text="matching@example.com" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="490" minWidth="490" prefWidth="490" spacing="0">
+                      <Label maxWidth="474" styleClass="table-text" text="PROFILE_ACCESS_GRANTED · Emily / Bright School" wrapText="true" />
+                    </VBox>
+                  </HBox>
+                  <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                    <VBox alignment="CENTER_LEFT" maxWidth="160" minWidth="160" prefWidth="160" spacing="0">
+                      <Label maxWidth="144" styleClass="table-text" text="14/10 · 10:00" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="130" minWidth="130" prefWidth="130" spacing="0">
+                      <Label styleClass="badge,badge-blue" text="INFO" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="200" minWidth="200" prefWidth="200" spacing="0">
+                      <Label maxWidth="184" styleClass="table-text" text="matching@example.com" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="490" minWidth="490" prefWidth="490" spacing="0">
+                      <Label maxWidth="474" styleClass="table-text" text="PROFILE_READY · Emily Martin" wrapText="true" />
+                    </VBox>
+                  </HBox>
+                  <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
+                    <VBox alignment="CENTER_LEFT" maxWidth="160" minWidth="160" prefWidth="160" spacing="0">
+                      <Label maxWidth="144" styleClass="table-text" text="14/10 · 09:25" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="130" minWidth="130" prefWidth="130" spacing="0">
+                      <Label styleClass="badge,badge-amber" text="WARN" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="200" minWidth="200" prefWidth="200" spacing="0">
+                      <Label maxWidth="184" styleClass="table-text" text="emily@example.com" wrapText="true" />
+                    </VBox>
+                    <VBox alignment="CENTER_LEFT" maxWidth="490" minWidth="490" prefWidth="490" spacing="0">
+                      <Label maxWidth="474" styleClass="table-text" text="UPLOAD_PENDING · Unprocessed video" wrapText="true" />
+                    </VBox>
+                  </HBox>
+                </VBox>
+              </VBox>
+              <Label maxWidth="Infinity" styleClass="note" text="Mock logs only illustrate structure. The deployed version does not log passwords or sensitive data." wrapText="true" />
+            </VBox>
+          </content>
+        </ScrollPane>
+      </center>
+    </BorderPane>
+  </center>
+</BorderPane>
