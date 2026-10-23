@@ -392,9 +392,13 @@ public class PortalStore {
             long id,
             String status,
             String result,
-            String feedback) {
+            String feedback,
+            String meetUrl) {
 
         Interview interview = findInterview(id);
+        if (meetUrl != null && !meetUrl.isBlank()) {
+            interview.setMeetingUrl(meetUrl);
+        }
 
         if (interview == null) {
             return;

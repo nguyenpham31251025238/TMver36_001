@@ -74,7 +74,7 @@
                 </HBox>
                 <Label maxWidth="Infinity" styleClass="note" text="Profile submitted on 14/10/2026. Update information when Matching requests." wrapText="true" />
               </VBox>
-              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
                 <Label styleClass="section-title" text="Personal Information" />
                 <HBox alignment="CENTER_LEFT" spacing="12">
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
@@ -89,7 +89,7 @@
                 <HBox alignment="CENTER_LEFT" spacing="12">
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
                     <Label styleClass="field-label" text="Nationality" />
-                    <ComboBox maxWidth="Infinity" prefWidth="230">
+                    <ComboBox fx:id="nationalityCombo" maxWidth="Infinity" prefWidth="230">
                       <items>
                         <FXCollections fx:factory="observableArrayList">
                           <String fx:value="United Kingdom" />
@@ -105,17 +105,17 @@
                   </VBox>
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
                     <Label styleClass="field-label" text="Phone number" />
-                    <TextField prefWidth="280" promptText="" text="+44 7700 900123" />
+                    <TextField fx:id="phoneField" prefWidth="280" promptText="" text="+44 7700 900123" />
                   </VBox>
                 </HBox>
                 <HBox alignment="CENTER_LEFT" spacing="12">
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
                     <Label styleClass="field-label" text="Teaching experience" />
-                    <TextField prefWidth="280" promptText="" text="4 years" />
+                    <TextField fx:id="experienceCombo" prefWidth="280" promptText="" text="4 years" />
                   </VBox>
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
                     <Label styleClass="field-label" text="Target age group" />
-                    <ComboBox maxWidth="Infinity" prefWidth="230">
+                    <ComboBox fx:id="aboutArea" maxWidth="Infinity" prefWidth="230">
                       <items>
                         <FXCollections fx:factory="observableArrayList">
                           <String fx:value="Kindergarten" />
@@ -134,11 +134,11 @@
                 <HBox alignment="CENTER_LEFT" spacing="12">
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
                     <Label styleClass="field-label" text="Preferred location" />
-                    <TextField prefWidth="280" promptText="" text="Hanoi, Danang" />
+                    <TextField fx:id="locationCombo" prefWidth="280" promptText="" text="Hanoi, Danang" />
                   </VBox>
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
                     <Label styleClass="field-label" text="Available start date" />
-                    <TextField prefWidth="280" promptText="" text="01/12/2026" />
+                    <TextField fx:id="dateSelect" prefWidth="280" promptText="" text="01/12/2026" />
                   </VBox>
                 </HBox>
                 <VBox spacing="7">

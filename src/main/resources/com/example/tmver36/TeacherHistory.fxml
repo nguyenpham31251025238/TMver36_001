@@ -74,7 +74,7 @@
                   <Label styleClass="small" text="Link provided by Matching" />
                 </VBox>
               </HBox>
-              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+              <VBox fx:id="historyTable" spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
                 <Label styleClass="section-title" text="Profile history" />
                 <VBox spacing="0" styleClass="table">
                   <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
@@ -145,7 +145,6 @@
                   </HBox>
                 </VBox>
               </VBox>
-              <Label maxWidth="Infinity" styleClass="note" text="Statuses and figures on this screen are mock data for MatchStatusHistory." wrapText="true" />
             </VBox>
           </content>
         </ScrollPane>

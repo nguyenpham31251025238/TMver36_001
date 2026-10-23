@@ -61,7 +61,7 @@
                 </VBox>
                 <Region HBox.hgrow="ALWAYS" />
               </HBox>
-              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
                 <HBox alignment="CENTER_LEFT" spacing="12">
                   <Label styleClass="section-title" text="Available interview times" />
                   <Region HBox.hgrow="ALWAYS" />
@@ -74,7 +74,7 @@
                   </VBox>
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
                     <Label styleClass="field-label" text="From" />
-                    <ComboBox maxWidth="Infinity" prefWidth="230">
+                    <ComboBox fx:id="fromCombo" maxWidth="Infinity" prefWidth="230">
                       <items>
                         <FXCollections fx:factory="observableArrayList">
                           <String fx:value="09:00" />
@@ -90,7 +90,7 @@
                   </VBox>
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
                     <Label styleClass="field-label" text="To" />
-                    <ComboBox maxWidth="Infinity" prefWidth="230">
+                    <ComboBox fx:id="toCombo" maxWidth="Infinity" prefWidth="230">
                       <items>
                         <FXCollections fx:factory="observableArrayList">
                           <String fx:value="10:00" />
@@ -107,7 +107,7 @@
                   <Button fx:id="addSlotButton" styleClass="primary" text="Add time slot" />
                 </HBox>
                 <VBox spacing="0" styleClass="table">
-                  <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
+                  <HBox fx:id="slotsTable" alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
                     <VBox alignment="CENTER_LEFT" maxWidth="230" minWidth="230" prefWidth="230" spacing="0">
                       <Label maxWidth="214" styleClass="table-head" text="DATE" wrapText="true" />
                     </VBox>
@@ -174,7 +174,7 @@
                 <Label styleClass="body" text="Green English Center · 20/10/2026 · 10:00 - 10:30 · UTC+7" />
                 <HBox alignment="CENTER_LEFT" spacing="12">
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
-                    <Label styleClass="field-label" text="Meet link (mock, room not created)" />
+                    <Label fx:id="meetLinkField" styleClass="field-label" text="Meet link (mock, room not created)" />
                     <TextField prefWidth="280" promptText="" text="https://meet.google.com/xxx-yyyy-zzz" />
                   </VBox>
                   <Button fx:id="openMeetButton" styleClass="secondary" text="Open demo room" />

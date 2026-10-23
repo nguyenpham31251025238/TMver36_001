@@ -92,7 +92,7 @@
                   <Button fx:id="searchLogsButton" styleClass="primary" text="Search" />
                 </HBox>
               </VBox>
-              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
                 <Label styleClass="section-title" text="Recent Activities" />
                 <VBox spacing="0" styleClass="table">
                   <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
@@ -181,7 +181,6 @@
                   </HBox>
                 </VBox>
               </VBox>
-              <Label maxWidth="Infinity" styleClass="note" text="Mock logs only illustrate structure. The deployed version does not log passwords or sensitive data." wrapText="true" />
             </VBox>
           </content>
         </ScrollPane>

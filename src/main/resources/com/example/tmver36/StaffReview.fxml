@@ -75,9 +75,9 @@
                   <Label styleClass="body" text="Preference: Primary · Start date 01/12/2026" />
                   <VBox spacing="7">
                     <Label styleClass="field-label" text="Introduction" />
-                    <TextArea prefHeight="92" promptText="" text="Experienced primary English teacher. CELTA certified." wrapText="true" />
+                    <TextArea fx:id="introductionArea" prefHeight="92" promptText="" text="Experienced primary English teacher. CELTA certified." wrapText="true" />
                   </VBox>
-                  <VBox spacing="0" styleClass="table">
+                  <VBox spacing="0" styleClass="table" VBox.vgrow="ALWAYS">
                     <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
                       <VBox alignment="CENTER_LEFT" maxWidth="350" minWidth="350" prefWidth="350" spacing="0">
                         <Label maxWidth="334" styleClass="table-head" text="DOCUMENT" wrapText="true" />
@@ -129,7 +129,7 @@
                   <CheckBox text="Declared interview time slots" />
                   <VBox spacing="7">
                     <Label styleClass="field-label" text="Comments to teacher" />
-                    <TextArea prefHeight="92" promptText="Specify missing information..." text="" wrapText="true" />
+                    <TextArea fx:id="commentsArea" prefHeight="92" promptText="Specify missing information..." text="" wrapText="true" />
                   </VBox>
                   <Button fx:id="requestChangesButton" maxWidth="Infinity" styleClass="secondary" text="Request update" />
                   <Button fx:id="readyStatusButton" maxWidth="Infinity" styleClass="primary" text="Mark as ready" />

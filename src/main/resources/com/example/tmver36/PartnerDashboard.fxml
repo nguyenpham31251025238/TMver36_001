@@ -61,7 +61,7 @@
                 </VBox>
                 <Region HBox.hgrow="ALWAYS" />
               </HBox>
-              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
                 <HBox alignment="CENTER_LEFT" spacing="12">
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
                     <Label styleClass="field-label" text="Search in shared profiles" />
@@ -139,7 +139,7 @@
                   <Button fx:id="nav_PartnerProfile__4" maxWidth="Infinity" styleClass="primary" text="View profile &amp; video" />
                 </VBox>
               </HBox>
-              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
                 <HBox alignment="CENTER_LEFT" spacing="12">
                   <Label styleClass="section-title" text="Next steps" />
                   <Region HBox.hgrow="ALWAYS" />

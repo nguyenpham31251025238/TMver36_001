@@ -70,7 +70,7 @@
                 <Tab text="Accounts">
                   <content>
                     <VBox spacing="18" styleClass="tab-body">
-                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
                         <HBox alignment="CENTER_LEFT" spacing="12">
                           <VBox fx:id="searchField" spacing="7" HBox.hgrow="ALWAYS">
                             <Label styleClass="field-label" text="Search accounts" />
@@ -105,7 +105,7 @@
                                       </columns>
                                     </TableView>
                       </VBox>
-                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
                         <Label styleClass="section-title" text="Create / Update profile" />
                         <HBox alignment="CENTER_LEFT" spacing="12">
                           <VBox spacing="7" HBox.hgrow="ALWAYS">
@@ -145,7 +145,7 @@
                 <Tab text="Permissions by role">
                   <content>
                     <VBox spacing="18" styleClass="tab-body">
-                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
                         <Label styleClass="section-title" text="System permission scope" />
                         <VBox spacing="0" styleClass="table">
                           <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">

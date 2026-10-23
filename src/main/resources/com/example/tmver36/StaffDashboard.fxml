@@ -83,7 +83,7 @@
                   </VBox>
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
                     <Label styleClass="field-label" text="Nationality" />
-                    <ComboBox maxWidth="Infinity" prefWidth="230">
+                    <ComboBox fx:id="nationalityFilter" maxWidth="Infinity" prefWidth="230">
                       <items>
                         <FXCollections fx:factory="observableArrayList">
                           <String fx:value="All" />
@@ -99,7 +99,7 @@
                   </VBox>
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
                     <Label styleClass="field-label" text="Status" />
-                    <ComboBox maxWidth="Infinity" prefWidth="230">
+                    <ComboBox fx:id="statusFilter" maxWidth="Infinity" prefWidth="230">
                       <items>
                         <FXCollections fx:factory="observableArrayList">
                           <String fx:value="All" />
@@ -117,7 +117,7 @@
                 <HBox alignment="CENTER_LEFT" spacing="12">
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
                     <Label styleClass="field-label" text="Experience" />
-                    <ComboBox maxWidth="Infinity" prefWidth="230">
+                    <ComboBox fx:id="experienceFilter" maxWidth="Infinity" prefWidth="230">
                       <items>
                         <FXCollections fx:factory="observableArrayList">
                           <String fx:value="All" />
@@ -133,7 +133,7 @@
                   </VBox>
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
                     <Label styleClass="field-label" text="Certificates" />
-                    <ComboBox maxWidth="Infinity" prefWidth="230">
+                    <ComboBox fx:id="certificateFilter" maxWidth="Infinity" prefWidth="230">
                       <items>
                         <FXCollections fx:factory="observableArrayList">
                           <String fx:value="All" />
@@ -149,7 +149,7 @@
                   </VBox>
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
                     <Label styleClass="field-label" text="Location" />
-                    <ComboBox maxWidth="Infinity" prefWidth="230">
+                    <ComboBox fx:id="locationFilter" maxWidth="Infinity" prefWidth="230">
                       <items>
                         <FXCollections fx:factory="observableArrayList">
                           <String fx:value="All" />
@@ -165,7 +165,7 @@
                   </VBox>
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
                     <Label styleClass="field-label" text="Expected Salary" />
-                    <ComboBox maxWidth="Infinity" prefWidth="230">
+                    <ComboBox fx:id="salaryFilter" maxWidth="Infinity" prefWidth="230">
                       <items>
                         <FXCollections fx:factory="observableArrayList">
                           <String fx:value="All" />
@@ -182,7 +182,7 @@
                   <Button fx:id="filterProfilesButton" styleClass="primary" text="Filter profiles" />
                 </HBox>
               </VBox>
-              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+              <VBox fx:id="tableContainer" spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
                 <HBox alignment="CENTER_LEFT" spacing="12">
                   <Label styleClass="section-title" text="Candidate list" />
                   <Region HBox.hgrow="ALWAYS" />

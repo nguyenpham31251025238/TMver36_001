@@ -67,7 +67,7 @@
                 <Tab text="Interview Request">
                   <content>
                     <VBox spacing="18" styleClass="tab-body">
-                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
                         <HBox alignment="CENTER_LEFT" spacing="12">
                           <Label styleClass="section-title" text="Emily Martin · Shared time slots" />
                           <Region HBox.hgrow="ALWAYS" />
@@ -117,7 +117,7 @@
                           <Button fx:id="requestInterviewButton" styleClass="primary" text="Send interview request" />
                         </HBox>
                       </VBox>
-                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
                         <Label styleClass="section-title" text="Track requests" />
                         <VBox spacing="0" styleClass="table">
                           <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
@@ -174,7 +174,7 @@
                         <Label styleClass="section-title" text="Post-interview results" />
                         <VBox spacing="7" HBox.hgrow="ALWAYS">
                           <Label styleClass="field-label" text="Interview" />
-                          <ComboBox maxWidth="Infinity" prefWidth="500">
+                          <ComboBox fx:id="interviewSelector" maxWidth="Infinity" prefWidth="500">
                             <items>
                               <FXCollections fx:factory="observableArrayList">
                                 <String fx:value="Daniel Walker · 15/10/2026" />
@@ -204,7 +204,7 @@
                           </VBox>
                           <VBox spacing="7" HBox.hgrow="ALWAYS">
                             <Label styleClass="field-label" text="Suitability" />
-                            <ComboBox maxWidth="Infinity" prefWidth="230">
+                            <ComboBox fx:id="suitabilityCombo" maxWidth="Infinity" prefWidth="230">
                               <items>
                                 <FXCollections fx:factory="observableArrayList">
                                   <String fx:value="Qualified" />

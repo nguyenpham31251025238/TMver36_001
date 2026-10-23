@@ -62,7 +62,7 @@
                 </VBox>
                 <Region HBox.hgrow="ALWAYS" />
               </HBox>
-              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
                 <Label styleClass="section-title" text="Add document" />
                 <HBox alignment="CENTER_LEFT" spacing="12">
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
@@ -99,7 +99,7 @@
                   <Button fx:id="addDocumentButton" styleClass="primary" text="Add document" />
                 </HBox>
               </VBox>
-              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+              <VBox fx:id="documentsTable" spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
                 <Label styleClass="section-title" text="Documents in profile" />
                 <VBox spacing="0" styleClass="table">
                   <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
