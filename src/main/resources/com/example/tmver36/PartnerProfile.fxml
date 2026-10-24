@@ -13,7 +13,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 
-<BorderPane prefHeight="900" prefWidth="1360" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.PartnerProfileController">
+<BorderPane prefHeight="900" prefWidth="1360" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.PartnerProfileController">
   <left>
     <VBox minWidth="228" prefWidth="228" spacing="14" styleClass="sidebar">
       <HBox alignment="CENTER_LEFT" spacing="12">
@@ -90,7 +90,7 @@
                   <Label maxWidth="510" styleClass="body" text="Experienced primary English teacher with a CELTA certificate. Available from December 2026." wrapText="true" />
                 </VBox>
                 <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
-                  <Label fx:id="shortlistDecision" styleClass="section-title" text="Shortlist Evaluation" />
+                  <Label fx:id="shortlistTitle" styleClass="section-title" text="Shortlist Evaluation" />
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
                     <Label styleClass="field-label" text="Decision" />
                     <ComboBox fx:id="shortlistDecision" maxWidth="Infinity" prefWidth="230">

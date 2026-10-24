@@ -13,7 +13,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 
-<BorderPane prefHeight="900" prefWidth="1360" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.TeacherProfileController">
+<BorderPane prefHeight="900" prefWidth="1360" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.TeacherProfileController">
   <left>
     <VBox minWidth="228" prefWidth="228" spacing="14" styleClass="sidebar">
       <HBox alignment="CENTER_LEFT" spacing="12">
@@ -143,7 +143,7 @@
                 </HBox>
                 <VBox spacing="7">
                   <Label styleClass="field-label" text="About me" />
-                  <TextArea prefHeight="92" promptText="" text="Experienced primary English teacher with a CELTA certificate. I enjoy building engaging lessons through games and collaborative activities." wrapText="true" />
+                  <TextArea fx:id="bioArea" prefHeight="92" promptText="" text="Experienced primary English teacher with a CELTA certificate. I enjoy building engaging lessons through games and collaborative activities." wrapText="true" />
                 </VBox>
                 <HBox alignment="CENTER_LEFT" spacing="12">
                   <Region HBox.hgrow="ALWAYS" />

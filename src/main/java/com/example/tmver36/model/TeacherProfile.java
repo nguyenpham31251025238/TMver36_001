@@ -1,9 +1,7 @@
-
 package com.example.tmver36.model;
 
 public class TeacherProfile {
     private long id;
-
     private String name;
     private String fullName;
     private String email;
@@ -16,6 +14,10 @@ public class TeacherProfile {
     private String cvUrl;
     private String subject;
     private String bio;
+    private String phone;
+    private String targetAgeGroup;
+    private String availableStartDate;
+    private String timezone;
 
     public TeacherProfile(
             long id,
@@ -40,8 +42,12 @@ public class TeacherProfile {
         this.status = status;
         this.videoUrl = videoUrl;
         this.cvUrl = cvUrl;
-        this.subject = "";
-        this.bio = "";
+        this.subject = "English (ESL)";
+        this.bio = "Experienced English teacher with international classroom experience.";
+        this.phone = "+84 912 345 678";
+        this.targetAgeGroup = "Primary (6-11)";
+        this.availableStartDate = "01/12/2026";
+        this.timezone = "UTC+7 (Vietnam)";
     }
 
     public long getId() {
@@ -145,4 +151,41 @@ public class TeacherProfile {
     public void setBio(String bio) {
         this.bio = bio;
     }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getTargetAgeGroup() {
+        return targetAgeGroup;
+    }
+
+    public void setTargetAgeGroup(String targetAgeGroup) {
+        this.targetAgeGroup = targetAgeGroup;
+    }
+
+    public String getAvailableStartDate() {
+        return availableStartDate;
+    }
+
+    public void setAvailableStartDate(String availableStartDate) {
+        this.availableStartDate = availableStartDate;
+    }
+
+    public String getTimezone() {
+        return timezone;
+    }
+
+    public void setTimezone(String timezone) {
+        this.timezone = timezone;
+    }
+
+    public String getCertificates() { return qualification; }
+    public String getCertificatesUrl() { return cvUrl; }
+    public String getIntroVideoUrl() { return videoUrl; }
+    public String getDemoUrl() { return videoUrl; }
 }

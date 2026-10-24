@@ -12,7 +12,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 
-<BorderPane prefHeight="900" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.StaffDashboardController">
+<BorderPane prefHeight="900" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.StaffDashboardController">
   <left>
     <VBox minWidth="228" prefWidth="228" spacing="14" styleClass="sidebar">
       <HBox alignment="CENTER_LEFT" spacing="12">
@@ -179,16 +179,20 @@
                       </value>
                     </ComboBox>
                   </VBox>
+                  <VBox spacing="7" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Share with partner" />
+                    <ComboBox fx:id="partnerAccessSelector" maxWidth="Infinity" prefWidth="230" promptText="Select partner" />
+                  </VBox>
                   <Button fx:id="filterProfilesButton" styleClass="primary" text="Filter profiles" />
                 </HBox>
               </VBox>
-              <VBox fx:id="tableContainer" spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
+              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
                 <HBox alignment="CENTER_LEFT" spacing="12">
                   <Label styleClass="section-title" text="Candidate list" />
                   <Region HBox.hgrow="ALWAYS" />
                   <Label styleClass="muted" text="4 mock profiles" />
                 </HBox>
-                <VBox spacing="0" styleClass="table">
+                <VBox fx:id="tableContainer" spacing="0" styleClass="table">
                   <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
                     <VBox alignment="CENTER_LEFT" maxWidth="260" minWidth="260" prefWidth="260" spacing="0">
                       <Label maxWidth="244" styleClass="table-head" text="TEACHER" wrapText="true" />

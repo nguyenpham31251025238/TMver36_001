@@ -14,7 +14,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 
-<BorderPane prefHeight="900" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.InterviewWorkspaceController">
+<BorderPane prefHeight="900" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.InterviewWorkspaceController">
   <left>
     <VBox minWidth="228" prefWidth="228" spacing="14" styleClass="sidebar">
       <HBox alignment="CENTER_LEFT" spacing="12">
@@ -70,8 +70,8 @@
                   <content>
                     <VBox spacing="18" styleClass="tab-body">
                       <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
-                        <VBox spacing="0" styleClass="table">
-                          <HBox fx:id="coordinationTable" alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
+                        <VBox fx:id="coordinationTable" spacing="0" styleClass="table">
+                          <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
                             <VBox alignment="CENTER_LEFT" maxWidth="400" minWidth="400" prefWidth="400" spacing="0">
                               <Label maxWidth="384" styleClass="table-head" text="TEACHER / PARTNER" wrapText="true" />
                             </VBox>
@@ -124,14 +124,14 @@
                           </VBox>
                           <VBox spacing="7" HBox.hgrow="ALWAYS">
                             <Label styleClass="field-label" text="Link Meet" />
-                            <TextField fx:id="meetLinkField" prefWidth="280" promptText="Paste created room link" text="" />
+                            <TextField fx:id="meetUrl" prefWidth="280" promptText="Paste created room link" text="" />
                           </VBox>
                         </HBox>
                         <Label maxWidth="Infinity" styleClass="note" text="Only finalize schedule when the teacher has confirmed. The create room button is designed for the Google Meet integration step." wrapText="true" />
                         <HBox alignment="CENTER_LEFT" spacing="12">
                           <Button fx:id="createMeetButton" styleClass="secondary" text="Create Meet room (integrated)" />
                           <Region HBox.hgrow="ALWAYS" />
-                          <Button fx:id="btnFinalizeInterview" styleClass="primary" text="Save link &amp; finalize schedule" />
+                          <Button fx:id="finalizeInterviewButton" styleClass="primary" text="Save link &amp; finalize schedule" />
                         </HBox>
                       </VBox>
                     </VBox>
@@ -142,7 +142,7 @@
                     <VBox spacing="18" styleClass="tab-body">
                       <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
                         <Label styleClass="section-title" text="Feedback from partner" />
-                        <VBox spacing="0" styleClass="table">
+                        <VBox fx:id="feedbackTable" spacing="0" styleClass="table">
                           <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
                             <VBox alignment="CENTER_LEFT" maxWidth="240" minWidth="240" prefWidth="240" spacing="0">
                               <Label maxWidth="224" styleClass="table-head" text="TEACHER" wrapText="true" />
@@ -205,7 +205,7 @@
                             </value>
                           </ComboBox>
                         </VBox>
-                        <Button fx:id="btnUpdateStage" styleClass="primary" text="Update connection history" />
+                        <Button fx:id="updateHistoryButton" styleClass="primary" text="Update connection history" />
                       </VBox>
                     </VBox>
                   </content>

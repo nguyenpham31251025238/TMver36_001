@@ -12,7 +12,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 
-<BorderPane prefHeight="900" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.TeacherDocumentsController">
+<BorderPane prefHeight="900" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.TeacherDocumentsController">
   <left>
     <VBox minWidth="228" prefWidth="228" spacing="14" styleClass="sidebar">
       <HBox alignment="CENTER_LEFT" spacing="12">
@@ -99,9 +99,9 @@
                   <Button fx:id="addDocumentButton" styleClass="primary" text="Add document" />
                 </HBox>
               </VBox>
-              <VBox fx:id="documentsTable" spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
+              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
                 <Label styleClass="section-title" text="Documents in profile" />
-                <VBox spacing="0" styleClass="table">
+                <VBox fx:id="documentsTable" spacing="0" styleClass="table">
                   <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
                     <VBox alignment="CENTER_LEFT" maxWidth="350" minWidth="350" prefWidth="350" spacing="0">
                       <Label maxWidth="334" styleClass="table-head" text="DOCUMENT" wrapText="true" />

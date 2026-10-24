@@ -1,4 +1,7 @@
 target/
+dist/
+installer/
+.tmver36_001/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/

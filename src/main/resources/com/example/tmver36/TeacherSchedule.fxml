@@ -13,7 +13,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 
-<BorderPane prefHeight="900" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.TeacherScheduleController">
+<BorderPane prefHeight="900" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.TeacherScheduleController">
   <left>
     <VBox minWidth="228" prefWidth="228" spacing="14" styleClass="sidebar">
       <HBox alignment="CENTER_LEFT" spacing="12">
@@ -106,8 +106,8 @@
                   </VBox>
                   <Button fx:id="addSlotButton" styleClass="primary" text="Add time slot" />
                 </HBox>
-                <VBox spacing="0" styleClass="table">
-                  <HBox fx:id="slotsTable" alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
+                <VBox fx:id="slotsTable" spacing="0" styleClass="table">
+                  <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
                     <VBox alignment="CENTER_LEFT" maxWidth="230" minWidth="230" prefWidth="230" spacing="0">
                       <Label maxWidth="214" styleClass="table-head" text="DATE" wrapText="true" />
                     </VBox>
@@ -174,10 +174,10 @@
                 <Label styleClass="body" text="Green English Center · 20/10/2026 · 10:00 - 10:30 · UTC+7" />
                 <HBox alignment="CENTER_LEFT" spacing="12">
                   <VBox spacing="7" HBox.hgrow="ALWAYS">
-                    <Label fx:id="meetLinkField" styleClass="field-label" text="Meet link (mock, room not created)" />
-                    <TextField prefWidth="280" promptText="" text="https://meet.google.com/xxx-yyyy-zzz" />
+                    <Label styleClass="field-label" text="Meeting link" />
+                    <TextField fx:id="meetLinkField" editable="false" prefWidth="280" promptText="Link is set after confirmation" />
                   </VBox>
-                  <Button fx:id="openMeetButton" styleClass="secondary" text="Open demo room" />
+                  <Button fx:id="openMeetButton" disable="true" styleClass="secondary" text="Open meeting link" />
                 </HBox>
               </VBox>
             </VBox>

@@ -2,6 +2,7 @@ package com.example.tmver36;
 
 import com.example.tmver36.model.AppUser;
 import com.example.tmver36.service.PortalStore;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
@@ -13,15 +14,26 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.stage.Stage;
+import javafx.stage.Window;
 
 import java.io.IOException;
 import java.net.URL;
 import java.util.Map;
+import java.util.Set;
 
-/** JavaFX login controller. Uses the project's existing PortalStore authentication. */
+/**
+ * Login controller and shared session/navigation entry point.
+ */
 public class LoginController {
-    /** Shared in-memory store so navigation between JavaFX screens keeps the same data. */
-    public static final PortalStore STORE = AdminAccountsController.STORE;
+
+    public static final PortalStore STORE = new PortalStore();
+
+    private static final Map<String, Set<String>> ROLE_SCREENS = Map.of(
+            "ADMIN", Set.of("AdminAccounts.fxml", "AdminLogs.fxml"),
+            "STAFF", Set.of("StaffDashboard.fxml", "StaffReview.fxml", "InterviewWorkspace.fxml"),
+            "PARTNER", Set.of("PartnerDashboard.fxml", "PartnerProfile.fxml", "PartnerInterview.fxml"),
+            "TEACHER", Set.of("TeacherProfile.fxml", "TeacherDocuments.fxml", "TeacherSchedule.fxml", "TeacherHistory.fxml")
+    );
 
     private static String currentUsername;
     private static String currentRole;
@@ -31,88 +43,72 @@ public class LoginController {
     @FXML private PasswordField passwordField;
     @FXML private Button loginButton;
 
+    // Optional aliases for compatibility
+    @FXML private TextField usernameField;
+    @FXML private ComboBox<String> roleCombo;
+
     @FXML
     private void initialize() {
-        if (demoRole != null && demoRole.getValue() == null && !demoRole.getItems().isEmpty()) {
-            demoRole.getSelectionModel().selectFirst();
+        ComboBox<String> rc = activeRoleCombo();
+        if (rc != null && rc.getValue() == null && !rc.getItems().isEmpty()) {
+            rc.getSelectionModel().selectFirst();
         }
         if (loginButton != null) {
             loginButton.setDefaultButton(true);
         }
     }
 
+    private TextField activeUserField() {
+        return emailField != null ? emailField : usernameField;
+    }
+
+    private ComboBox<String> activeRoleCombo() {
+        return demoRole != null ? demoRole : roleCombo;
+    }
+
     @FXML
-    private void handleLoginAction() {
-        String username = emailField == null ? "" : emailField.getText().trim();
-        String password = passwordField == null ? "" : passwordField.getText();
-        String selectedRoleLabel = demoRole == null ? null : demoRole.getValue();
+    private void handleLoginAction(ActionEvent event) {
+        TextField userInput = activeUserField();
+        ComboBox<String> roleInput = activeRoleCombo();
 
-        if (username.isBlank() || password.isBlank()) {
-            showError("Missing credentials", "Enter your username and password.");
+        String username = userInput == null || userInput.getText() == null
+                ? ""
+                : userInput.getText().trim();
+        String password = passwordField == null || passwordField.getText() == null
+                ? ""
+                : passwordField.getText();
+        String selectedRole = roleInput == null ? null : roleInput.getValue();
+
+        if (username.isEmpty() || password.isEmpty()) {
+            showError("Missing login details", "Please enter both your username and password.");
             return;
         }
 
-        AppUser user = STORE.authenticate(username, password);
-        if (user == null) {
+        String expectedRole = mapSelectedRole(selectedRole);
+        if (expectedRole == null) {
+            showError("Invalid role", "Please choose a valid role before entering the workspace.");
+            return;
+        }
+
+        AppUser authenticatedUser = STORE.authenticate(username, password);
+        if (authenticatedUser == null) {
             STORE.log(username, "Failed login attempt");
-            showError("Login failed", "The username or password is incorrect.");
+            showError("Sign-in failed", "Incorrect username or password, or account is disabled.");
             return;
         }
 
-        String selectedRole = roleFromLabel(selectedRoleLabel);
-        if (selectedRole == null || !selectedRole.equalsIgnoreCase(user.getRole())) {
-            showError("Role mismatch", "The selected preview role does not match this account's role.");
+        if (!expectedRole.equals(authenticatedUser.getRole())) {
+            showError("Role mismatch", "This account does not have permission for the selected role.");
             return;
         }
 
-        currentUsername = user.getUsername();
-        currentRole = user.getRole();
-        STORE.log(currentUsername, "Logged in as " + currentRole);
+        currentUsername = authenticatedUser.getUsername();
+        currentRole = authenticatedUser.getRole();
+        STORE.log(currentUsername, "Logged into " + currentRole + " workspace");
 
-        String destination = destinationForRole(currentRole);
-        if (!navigateTo(loginButton, destination)) {
-            showError("Navigation failed", "Could not load " + destination + ". Check that the FXML file is in the application's resource path.");
-        }
-    }
-
-    private String roleFromLabel(String label) {
-        if (label == null) return null;
-        return switch (label.trim().toLowerCase()) {
-            case "matching staff", "staff" -> "STAFF";
-            case "teacher" -> "TEACHER";
-            case "partner" -> "PARTNER";
-            case "system admin", "admin", "administrator" -> "ADMIN";
-            default -> null;
-        };
-    }
-
-    private String destinationForRole(String role) {
-        return switch (role) {
-            case "ADMIN" -> "AdminAccounts.fxml";
-            case "PARTNER" -> "PartnerDashboard.fxml";
-            case "TEACHER" -> "TeacherProfile.fxml";
-            case "STAFF" -> "StaffDashboard.fxml";
-            default -> "Login.fxml";
-        };
-    }
-
-    /** Loads a real FXML screen into the Stage currently displaying the source node. */
-    public static boolean navigateTo(Node source, String fxmlFile) {
-        try {
-            URL resource = LoginController.class.getResource("/com/example/tmver36/" + fxmlFile);
-            if (resource == null) {
-                // Also support projects that place FXML files at the resource root.
-                resource = LoginController.class.getResource("/" + fxmlFile);
-            }
-            if (resource == null || source == null || source.getScene() == null) return false;
-            Parent root = FXMLLoader.load(resource);
-            Stage stage = (Stage) source.getScene().getWindow();
-            stage.setScene(new Scene(root));
-            stage.show();
-            return true;
-        } catch (IOException | RuntimeException ex) {
-            ex.printStackTrace();
-            return false;
+        Node source = event != null && event.getSource() instanceof Node node ? node : loginButton;
+        if (!navigateTo(source, homeScreenForRole(currentRole))) {
+            showError("Navigation error", "Unable to open the workspace screen for " + selectedRole + ".");
         }
     }
 
@@ -124,11 +120,101 @@ public class LoginController {
         return currentRole;
     }
 
-    private void showError(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
+    public static void setCurrentSession(String username, String role) {
+        currentUsername = username;
+        currentRole = role;
+    }
+
+    public static void clearSession() {
+        currentUsername = null;
+        currentRole = null;
+    }
+
+    public static boolean navigateTo(Node source, String fxmlFile) {
+        try {
+            if ("Login.fxml".equals(fxmlFile)) {
+                if (currentUsername != null) {
+                    STORE.log(currentUsername, "Logged out");
+                }
+                currentUsername = null;
+                currentRole = null;
+            } else {
+                String effectiveRole = STORE.userRole(currentUsername);
+                if (effectiveRole == null) {
+                    effectiveRole = currentRole;
+                }
+                if (!canOpen(fxmlFile, effectiveRole)) {
+                    return false;
+                }
+            }
+            URL resource = LoginController.class.getResource(fxmlFile);
+            if (resource == null) {
+                resource = LoginController.class.getResource("/com/example/tmver36/" + fxmlFile);
+            }
+            if (resource == null) {
+                resource = LoginController.class.getResource("/" + fxmlFile);
+            }
+            if (resource == null || source == null || source.getScene() == null) {
+                return false;
+            }
+            Parent root = FXMLLoader.load(resource);
+            Scene currentScene = source.getScene();
+            Window window = currentScene.getWindow();
+            if (window instanceof Stage stage) {
+                Scene nextScene = new Scene(root, currentScene.getWidth(), currentScene.getHeight());
+                stage.setTitle(screenTitle(fxmlFile));
+                stage.setScene(nextScene);
+                stage.show();
+            } else {
+                currentScene.setRoot(root);
+            }
+            return true;
+        } catch (IOException | RuntimeException ex) {
+            return false;
+        }
+    }
+
+    public static boolean canOpen(String fxmlFile, String role) {
+        return role != null && ROLE_SCREENS.getOrDefault(role, Set.of()).contains(fxmlFile);
+    }
+
+    public static String homeScreenForRole(String role) {
+        return switch (role) {
+            case "ADMIN" -> "AdminAccounts.fxml";
+            case "STAFF" -> "StaffDashboard.fxml";
+            case "PARTNER" -> "PartnerDashboard.fxml";
+            case "TEACHER" -> "TeacherProfile.fxml";
+            default -> "Login.fxml";
+        };
+    }
+
+    private String mapSelectedRole(String roleLabel) {
+        if (roleLabel == null) return null;
+        return switch (roleLabel.trim()) {
+            case "System Admin", "Admin", "Administrator", "ADMIN" -> "ADMIN";
+            case "Matching Staff", "STAFF" -> "STAFF";
+            case "Partner", "PARTNER" -> "PARTNER";
+            case "Teacher", "TEACHER" -> "TEACHER";
+            default -> null;
+        };
+    }
+
+    private static String screenTitle(String fxmlFile) {
+        return "TeacherMatch - " + fxmlFile.replace(".fxml", "");
+    }
+
+    public static void showAlert(Alert.AlertType type, String title, String message) {
+        if (Boolean.getBoolean("tm.test.suppressAlerts")) {
+            return;
+        }
+        Alert alert = new Alert(type);
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+
+    private void showError(String title, String message) {
+        showAlert(Alert.AlertType.ERROR, title, message);
     }
 }

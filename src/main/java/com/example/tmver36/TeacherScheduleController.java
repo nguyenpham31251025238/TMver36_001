@@ -1,12 +1,16 @@
 package com.example.tmver36;
 
+import com.example.tmver36.model.AvailabilitySlot;
 import com.example.tmver36.model.Interview;
+import com.example.tmver36.model.TeacherProfile;
 import com.example.tmver36.service.PortalStore;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Parent;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
@@ -27,13 +31,11 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * JavaFX controller for teacher availability and interview requests.
- * Interview decisions are persisted through PortalStore. Availability slots are UI-session
- * data because PortalStore currently has no availability-slot model or CRUD API.
+ * JavaFX controller for teacher availability and interview requests (TeacherSchedule.fxml).
  */
 public class TeacherScheduleController {
+
     private static final PortalStore STORE = LoginController.STORE;
-    private static final long DEMO_TEACHER_ID = 1L;
     private static final DateTimeFormatter SLOT_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     @FXML private Button nav_TeacherProfile;
@@ -41,19 +43,21 @@ public class TeacherScheduleController {
     @FXML private Button nav_TeacherSchedule;
     @FXML private Button nav_TeacherHistory;
     @FXML private Button nav_Login;
+
     @FXML private DatePicker availabilityDate;
+    @FXML private ComboBox<String> fromCombo;
+    @FXML private ComboBox<String> toCombo;
     @FXML private Button addSlotButton;
     @FXML private Button removeSlotButton;
     @FXML private Button removeSlot2Button;
+    @FXML private VBox slotsTable;
+
     @FXML private Button acceptInterviewButton;
     @FXML private Button declineInterviewButton;
+    @FXML private TextField meetLinkField;
     @FXML private Button openMeetButton;
 
     private final ObservableList<AvailabilitySlot> slots = FXCollections.observableArrayList();
-    private ComboBox<String> fromCombo;
-    private ComboBox<String> toCombo;
-    private TextField meetLinkField;
-    private VBox slotsTable;
     private VBox pendingCard;
     private VBox confirmedCard;
     private Label statusMessage;
@@ -61,52 +65,78 @@ public class TeacherScheduleController {
 
     @FXML
     private void initialize() {
-        Parent root = root();
-        if (root == null) return;
-
-        locateControls(root);
         wireNavigation();
+
+        Parent root = FxNodes.rootOf(
+                nav_TeacherSchedule,
+                nav_TeacherDocuments,
+                nav_TeacherProfile,
+                addSlotButton,
+                slotsTable,
+                meetLinkField
+        );
+        if (root != null) {
+            locateControls(root);
+            updateSidebarHeader(root);
+        }
+
+        if (availabilityDate != null && availabilityDate.getValue() == null) {
+            availabilityDate.setValue(LocalDate.now().plusDays(2));
+        }
+
         wireSlotActions();
         wireInterviewActions();
         wireMeetAction();
-        loadSlotsFromExistingView();
+
+        slots.setAll(STORE.availabilitySlots(currentTeacherId()));
         renderSlots();
         refreshInterviews();
     }
 
+    private void updateSidebarHeader(Parent root) {
+        TeacherProfile profile = STORE.teacher(currentTeacherId());
+        if (profile == null) return;
+        for (Label label : FxNodes.findAllByStyleClass(root, "sidebar-name", Label.class)) {
+            label.setText(profile.getName());
+        }
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private void locateControls(Parent root) {
-        List<ComboBox> combos = root.lookupAll("ComboBox").stream()
-                .filter(ComboBox.class::isInstance).map(ComboBox.class::cast).toList();
-        if (!combos.isEmpty()) fromCombo = combos.get(0);
-        if (combos.size() > 1) toCombo = combos.get(1);
-
-        List<TextField> textFields = root.lookupAll("TextField").stream()
-                .filter(TextField.class::isInstance).map(TextField.class::cast).toList();
-        if (!textFields.isEmpty()) meetLinkField = textFields.get(0);
-
-        slotsTable = root.lookupAll(".table").stream()
-                .filter(VBox.class::isInstance).map(VBox.class::cast)
-                .filter(box -> box.getChildren().stream().anyMatch(node -> node instanceof HBox h && h.getStyleClass().contains("table-header")))
-                .findFirst().orElse(null);
-
-        List<VBox> cards = root.lookupAll(".card").stream()
-                .filter(VBox.class::isInstance).map(VBox.class::cast).toList();
-        for (VBox card : cards) {
-            String text = card.getChildren().stream().filter(Label.class::isInstance)
-                    .map(Label.class::cast).map(Label::getText).filter(s -> s != null)
-                    .reduce("", (a, b) -> a + " " + b).toLowerCase(Locale.ROOT);
+        if (slotsTable == null) {
+            slotsTable = FxNodes.findFirstByStyleClass(root, "table", VBox.class);
+        }
+        if (fromCombo == null || toCombo == null) {
+            List<ComboBox> combos = FxNodes.findAll(root, ComboBox.class);
+            if (!combos.isEmpty() && fromCombo == null) fromCombo = combos.get(0);
+            if (combos.size() > 1 && toCombo == null) toCombo = combos.get(1);
+        }
+        if (meetLinkField == null) {
+            for (TextField tf : FxNodes.findAll(root, TextField.class)) {
+                meetLinkField = tf;
+                break;
+            }
+        }
+        for (VBox card : FxNodes.findAllByStyleClass(root, "card", VBox.class)) {
+            String text = FxNodes.findAll(card, Label.class).stream()
+                    .map(Label::getText)
+                    .filter(s -> s != null)
+                    .reduce("", (a, b) -> a + " " + b)
+                    .toLowerCase(Locale.ROOT);
             if (text.contains("pending requests for you")) pendingCard = card;
             if (text.contains("confirmed interviews")) confirmedCard = card;
         }
-
-        statusMessage = root.lookupAll(".note").stream().filter(Label.class::isInstance)
-                .map(Label.class::cast).findFirst().orElse(null);
+        statusMessage = FxNodes.findFirstByStyleClass(root, "note", Label.class);
     }
 
     private void wireNavigation() {
         if (nav_TeacherProfile != null) nav_TeacherProfile.setOnAction(e -> navigate("TeacherProfile.fxml", nav_TeacherProfile));
         if (nav_TeacherDocuments != null) nav_TeacherDocuments.setOnAction(e -> navigate("TeacherDocuments.fxml", nav_TeacherDocuments));
-        if (nav_TeacherSchedule != null) nav_TeacherSchedule.setOnAction(e -> refreshInterviews());
+        if (nav_TeacherSchedule != null) nav_TeacherSchedule.setOnAction(e -> {
+            slots.setAll(STORE.availabilitySlots(currentTeacherId()));
+            renderSlots();
+            refreshInterviews();
+        });
         if (nav_TeacherHistory != null) nav_TeacherHistory.setOnAction(e -> navigate("TeacherHistory.fxml", nav_TeacherHistory));
         if (nav_Login != null) nav_Login.setOnAction(e -> navigate("Login.fxml", nav_Login));
     }
@@ -124,23 +154,6 @@ public class TeacherScheduleController {
 
     private void wireMeetAction() {
         if (openMeetButton != null) openMeetButton.setOnAction(e -> openMeetLink());
-    }
-
-    private void loadSlotsFromExistingView() {
-        // Preserve the two initial rows already present in the supplied FXML as demo-session slots.
-        // They are not persisted by PortalStore because it has no availability-slot API.
-        if (slotsTable == null) return;
-        for (Node node : new ArrayList<>(slotsTable.getChildren())) {
-            if (!(node instanceof HBox row) || !row.getStyleClass().contains("table-row")) continue;
-            List<String> labels = row.lookupAll("Label").stream().filter(Label.class::isInstance)
-                    .map(Label.class::cast).map(Label::getText).toList();
-            if (labels.size() >= 2) {
-                String date = labels.get(0).trim();
-                String time = labels.get(1).trim();
-                String[] parts = time.split("\\s*[-–]\\s*");
-                if (parts.length == 2) slots.add(new AvailabilitySlot(date, parts[0], parts[1]));
-            }
-        }
     }
 
     private void addSlot() {
@@ -164,18 +177,16 @@ public class TeacherScheduleController {
             setMessage("The selected time format is invalid.");
             return;
         }
-        String dateText = date.format(SLOT_DATE);
-        boolean duplicate = slots.stream().anyMatch(slot -> slot.date().equals(dateText)
-                && slot.from().equals(from) && slot.to().equals(to));
-        if (duplicate) {
-            setMessage("That availability slot already exists.");
+        LocalDateTime startAt = LocalDateTime.of(date, LocalTime.parse(from));
+        LocalDateTime endAt = LocalDateTime.of(date, LocalTime.parse(to));
+        long teacherId = currentTeacherId();
+        if (!STORE.addAvailabilitySlot(currentUsername(), teacherId, startAt, endAt)) {
+            setMessage("The slot must not overlap an existing slot.");
             return;
         }
-        slots.add(new AvailabilitySlot(dateText, from, to));
-        slots.sort(Comparator.comparing(AvailabilitySlot::date).thenComparing(AvailabilitySlot::from));
-        STORE.log(currentUsername(), "Added availability slot " + dateText + " " + from + "-" + to + " (session only)");
+        slots.setAll(STORE.availabilitySlots(teacherId));
         renderSlots();
-        setMessage("Availability slot added for this session. PortalStore does not currently persist availability slots.");
+        setMessage("Availability slot added.");
     }
 
     private void removeSlotByButton(Button button) {
@@ -183,12 +194,12 @@ public class TeacherScheduleController {
             setMessage("There are no availability slots to delete.");
             return;
         }
-        // The original FXML has two row-specific delete buttons; retain their intuitive first/second-row behavior.
         int index = button == removeSlot2Button ? Math.min(1, slots.size() - 1) : 0;
-        AvailabilitySlot removed = slots.remove(index);
-        STORE.log(currentUsername(), "Removed availability slot " + removed.date() + " " + removed.from() + "-" + removed.to() + " (session only)");
+        AvailabilitySlot removed = slots.get(index);
+        STORE.removeAvailabilitySlot(currentUsername(), removed.id());
+        slots.setAll(STORE.availabilitySlots(currentTeacherId()));
         renderSlots();
-        setMessage("Availability slot removed from this session.");
+        setMessage("Availability slot removed.");
     }
 
     private void renderSlots() {
@@ -202,16 +213,19 @@ public class TeacherScheduleController {
             slotsTable.getChildren().add(makeSlotRow("—", "No availability slots", "Add a slot above."));
             return;
         }
-        for (int i = 0; i < slots.size(); i++) {
-            AvailabilitySlot slot = slots.get(i);
-            HBox row = makeSlotRow(slot.date(), slot.from() + " - " + slot.to(), "Available");
+        for (AvailabilitySlot slot : slots) {
+            HBox row = makeSlotRow(
+                    slot.startAt().format(SLOT_DATE),
+                    slot.startAt().format(DateTimeFormatter.ofPattern("HH:mm")) + " - " + slot.endAt().format(DateTimeFormatter.ofPattern("HH:mm")),
+                    "Available"
+            );
             Button remove = new Button("Delete time");
             remove.getStyleClass().add("danger");
             remove.setOnAction(e -> {
-                slots.remove(slot);
-                STORE.log(currentUsername(), "Removed availability slot " + slot.date() + " " + slot.from() + "-" + slot.to() + " (session only)");
+                STORE.removeAvailabilitySlot(currentUsername(), slot.id());
+                slots.setAll(STORE.availabilitySlots(currentTeacherId()));
                 renderSlots();
-                setMessage("Availability slot removed from this session.");
+                setMessage("Availability slot removed.");
             });
             VBox actionCell = (VBox) row.getChildren().get(3);
             actionCell.getChildren().clear();
@@ -222,59 +236,70 @@ public class TeacherScheduleController {
 
     private HBox makeSlotRow(String date, String time, String status) {
         HBox row = new HBox(0);
-        row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        row.setAlignment(Pos.CENTER_LEFT);
         row.getStyleClass().add("table-row");
         row.getChildren().add(cell(date, 230));
         row.getChildren().add(cell(time, 270));
         VBox statusCell = new VBox();
-        statusCell.setMinWidth(230); statusCell.setPrefWidth(230); statusCell.setMaxWidth(230);
-        statusCell.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        statusCell.setMinWidth(230);
+        statusCell.setPrefWidth(230);
+        statusCell.setMaxWidth(230);
+        statusCell.setAlignment(Pos.CENTER_LEFT);
         Label statusLabel = new Label(status);
         statusLabel.getStyleClass().addAll("badge", "badge-green");
         statusCell.getChildren().add(statusLabel);
         row.getChildren().add(statusCell);
         VBox actionCell = new VBox();
-        actionCell.setMinWidth(250); actionCell.setPrefWidth(250); actionCell.setMaxWidth(250);
-        actionCell.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        actionCell.setMinWidth(250);
+        actionCell.setPrefWidth(250);
+        actionCell.setMaxWidth(250);
+        actionCell.setAlignment(Pos.CENTER_LEFT);
         row.getChildren().add(actionCell);
         return row;
     }
 
     private VBox cell(String value, double width) {
         VBox cell = new VBox();
-        cell.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        cell.setMinWidth(width); cell.setPrefWidth(width); cell.setMaxWidth(width);
+        cell.setAlignment(Pos.CENTER_LEFT);
+        cell.setMinWidth(width);
+        cell.setPrefWidth(width);
+        cell.setMaxWidth(width);
         Label label = new Label(value);
-        label.setWrapText(true); label.setMaxWidth(width - 16);
+        label.setWrapText(true);
+        label.setMaxWidth(width - 16);
         label.getStyleClass().add("table-text");
         cell.getChildren().add(label);
         return cell;
     }
 
     private void refreshInterviews() {
-        String username = currentUsername();
-        List<Interview> interviews = new ArrayList<>(STORE.visibleInterviews("TEACHER", username));
-        interviews.removeIf(i -> i == null || i.getTeacherId() != DEMO_TEACHER_ID);
+        long teacherId = currentTeacherId();
+        List<Interview> interviews = new ArrayList<>(STORE.visibleInterviews("TEACHER", currentUsername()));
+        interviews.removeIf(i -> i == null || i.getTeacherId() != teacherId);
         interviews.sort(Comparator.comparing(Interview::getDateTime, Comparator.nullsLast(String::compareTo)));
 
-        Interview pending = interviews.stream().filter(i -> "PENDING".equalsIgnoreCase(safe(i.getStatus())))
+        Interview pending = interviews.stream()
+                .filter(i -> "PENDING".equalsIgnoreCase(safe(i.getStatus())))
                 .findFirst().orElse(null);
         pendingInterviewId = pending == null ? -1L : pending.getId();
-        renderInterviewCard(pendingCard, pending, true);
+        renderInterviewCard(pendingCard, pending);
 
-        List<Interview> confirmed = interviews.stream().filter(i -> "CONFIRMED".equalsIgnoreCase(safe(i.getStatus()))).toList();
+        List<Interview> confirmed = interviews.stream()
+                .filter(i -> "CONFIRMED".equalsIgnoreCase(safe(i.getStatus())))
+                .toList();
         renderConfirmedCard(confirmedCard, confirmed);
         if (acceptInterviewButton != null) acceptInterviewButton.setDisable(pending == null);
         if (declineInterviewButton != null) declineInterviewButton.setDisable(pending == null);
     }
 
-    private void renderInterviewCard(VBox card, Interview interview, boolean isPending) {
+    private void renderInterviewCard(VBox card, Interview interview) {
         if (card == null) return;
-        Label detail = card.lookupAll("Label").stream().filter(Label.class::isInstance).map(Label.class::cast)
+        List<Label> labels = FxNodes.findAll(card, Label.class);
+        Label detail = labels.stream()
                 .filter(label -> safe(label.getText()).contains("Online interview") || safe(label.getText()).contains("No pending"))
                 .findFirst().orElse(null);
-        Label when = card.lookupAll("Label").stream().filter(Label.class::isInstance).map(Label.class::cast)
-                .filter(label -> safe(label.getText()).contains("UTC+7") || safe(label.getText()).contains("waiting for"))
+        Label when = labels.stream()
+                .filter(label -> safe(label.getText()).contains("UTC+7") || safe(label.getText()).contains("waiting for") || safe(label.getText()).contains("New requests"))
                 .findFirst().orElse(null);
         if (interview == null) {
             if (detail != null) detail.setText("No pending interview requests");
@@ -287,8 +312,12 @@ public class TeacherScheduleController {
 
     private void renderConfirmedCard(VBox card, List<Interview> confirmed) {
         if (card == null) return;
-        List<Label> labels = card.lookupAll("Label").stream().filter(Label.class::isInstance).map(Label.class::cast).toList();
-        Label detail = labels.stream().filter(label -> safe(label.getText()).contains("Green English Center") || safe(label.getText()).contains("No confirmed interviews"))
+        List<Label> labels = FxNodes.findAll(card, Label.class);
+        Label detail = labels.stream()
+                .filter(label -> safe(label.getText()).contains("Green English Center")
+                        || safe(label.getText()).contains("Bright School")
+                        || safe(label.getText()).contains("No confirmed interviews")
+                        || safe(label.getText()).contains("CONFIRMED"))
                 .findFirst().orElse(null);
         if (confirmed.isEmpty()) {
             if (detail != null) detail.setText("No confirmed interviews yet.");
@@ -299,11 +328,11 @@ public class TeacherScheduleController {
         Interview first = confirmed.get(0);
         if (detail != null) detail.setText(safe(first.getPartner()) + " · " + formatDateTime(first.getDateTime()) + " · CONFIRMED");
         if (meetLinkField != null) {
-            // The supplied Interview model may not expose a meeting-link getter; only replace the field when available.
-            String url = readStringProperty(first, "getMeetUrl", "getMeetingUrl", "getMeetLink", "getUrl");
-            meetLinkField.setText(url);
+            meetLinkField.setText(safe(first.getMeetingUrl()));
         }
-        if (openMeetButton != null) openMeetButton.setDisable(meetLinkField == null || safe(meetLinkField.getText()).isBlank());
+        if (openMeetButton != null) {
+            openMeetButton.setDisable(meetLinkField == null || safe(meetLinkField.getText()).isBlank());
+        }
     }
 
     private void updatePendingInterview(String status) {
@@ -311,8 +340,11 @@ public class TeacherScheduleController {
             setMessage("There is no pending interview request to update.");
             return;
         }
-        STORE.updateInterview(pendingInterviewId, status, null, null, "");
-        STORE.log(currentUsername(), "Teacher " + status.toLowerCase(Locale.ROOT) + " interview #" + pendingInterviewId);
+        String link = meetLinkField == null ? "" : safe(meetLinkField.getText());
+        if (!STORE.updateInterview(currentUsername(), pendingInterviewId, status, null, null, link)) {
+            setMessage("This account cannot update the selected interview.");
+            return;
+        }
         refreshInterviews();
         setMessage("Interview request updated: " + status + ".");
     }
@@ -329,8 +361,9 @@ public class TeacherScheduleController {
                 setMessage("The meeting link must begin with http:// or https://.");
                 return;
             }
-            if (Desktop.isDesktopSupported()) Desktop.getDesktop().browse(uri);
-            else setMessage("Opening a browser is not supported on this computer.");
+            if (Desktop.isDesktopSupported()) {
+                Desktop.getDesktop().browse(uri);
+            }
         } catch (Exception ex) {
             setMessage("Could not open the meeting link: " + ex.getMessage());
         }
@@ -345,28 +378,30 @@ public class TeacherScheduleController {
         }
     }
 
-    private String readStringProperty(Object target, String... getterNames) {
-        for (String getter : getterNames) {
-            try {
-                Object value = target.getClass().getMethod(getter).invoke(target);
-                if (value != null && !value.toString().isBlank()) return value.toString();
-            } catch (ReflectiveOperationException ignored) { }
-        }
-        return "";
+    private long currentTeacherId() {
+        long id = STORE.teacherIdForUser(currentUsername());
+        return id > 0 ? id : 1L;
     }
 
-    private Parent root() {
-        Button source = nav_TeacherSchedule != null ? nav_TeacherSchedule : nav_TeacherProfile;
-        return source == null || source.getScene() == null ? null : source.getScene().getRoot();
+    private void navigate(String fxml, Node source) {
+        LoginController.navigateTo(source, fxml);
     }
 
-    private void navigate(String fxml, Node source) { LoginController.navigateTo(source, fxml); }
     private String currentUsername() {
-        String username = LoginController.getCurrentUsername();
-        return username == null || username.isBlank() ? "teacher" : username;
+        String u = LoginController.getCurrentUsername();
+        return (u == null || u.isBlank()) ? "teacher" : u;
     }
-    private void setMessage(String message) { if (statusMessage != null) statusMessage.setText(message); }
-    private static String safe(String value) { return value == null ? "" : value.trim(); }
 
-    private record AvailabilitySlot(String date, String from, String to) { }
+    private void setMessage(String message) {
+        if (statusMessage != null) {
+            statusMessage.setText(message);
+        }
+        if ("The end time must be later than the start time.".equals(message)) {
+            LoginController.showAlert(Alert.AlertType.ERROR, "Invalid Time Range", message);
+        }
+    }
+
+    private static String safe(String value) {
+        return value == null ? "" : value.trim();
+    }
 }

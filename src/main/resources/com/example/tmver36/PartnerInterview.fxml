@@ -15,7 +15,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 
-<BorderPane prefHeight="900" prefWidth="1360" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.PartnerInterviewController">
+<BorderPane prefHeight="900" prefWidth="1360" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.PartnerInterviewController">
   <left>
     <VBox minWidth="228" prefWidth="228" spacing="14" styleClass="sidebar">
       <HBox alignment="CENTER_LEFT" spacing="12">
@@ -69,23 +69,17 @@
                     <VBox spacing="18" styleClass="tab-body">
                       <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
                         <HBox alignment="CENTER_LEFT" spacing="12">
-                          <Label styleClass="section-title" text="Emily Martin · Shared time slots" />
+                          <Label styleClass="section-title" text="Shared teacher availability" />
                           <Region HBox.hgrow="ALWAYS" />
                           <Label styleClass="badge,badge-gray" text="UTC+7" />
                         </HBox>
                         <VBox spacing="7" HBox.hgrow="ALWAYS">
+                          <Label styleClass="field-label" text="Select teacher" />
+                          <ComboBox fx:id="teacherSelector" maxWidth="Infinity" prefWidth="600" promptText="Choose a shared teacher" />
+                        </VBox>
+                        <VBox spacing="7" HBox.hgrow="ALWAYS">
                           <Label styleClass="field-label" text="Select time slot" />
-                          <ComboBox fx:id="requestedSlot" maxWidth="Infinity" prefWidth="600">
-                            <items>
-                              <FXCollections fx:factory="observableArrayList">
-                                <String fx:value="16/10/2026 · 14:00 - 15:00" />
-                                <String fx:value="19/10/2026 · 09:00 - 10:00" />
-                              </FXCollections>
-                            </items>
-                            <value>
-                              <String fx:value="16/10/2026 · 14:00 - 15:00" />
-                            </value>
-                          </ComboBox>
+                          <ComboBox fx:id="requestedSlot" maxWidth="Infinity" prefWidth="600" promptText="Choose a future time" />
                         </VBox>
                         <HBox alignment="CENTER_LEFT" spacing="12">
                           <VBox spacing="7" HBox.hgrow="ALWAYS">
@@ -105,7 +99,7 @@
                           </VBox>
                           <VBox spacing="7" HBox.hgrow="ALWAYS">
                             <Label styleClass="field-label" text="Interviewer" />
-                            <TextField prefWidth="280" promptText="" text="Recruitment Team - Bright School" />
+                            <TextField fx:id="interviewerField" prefWidth="280" promptText="" text="Recruitment Team - Bright School" />
                           </VBox>
                         </HBox>
                         <VBox spacing="7">
@@ -119,7 +113,7 @@
                       </VBox>
                       <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
                         <Label styleClass="section-title" text="Track requests" />
-                        <VBox spacing="0" styleClass="table">
+                        <VBox fx:id="requestsTable" spacing="0" styleClass="table">
                           <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
                             <VBox alignment="CENTER_LEFT" maxWidth="210" minWidth="210" prefWidth="210" spacing="0">
                               <Label maxWidth="194" styleClass="table-head" text="TEACHER" wrapText="true" />

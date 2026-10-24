@@ -5,7 +5,9 @@ import com.example.tmver36.service.PortalStore;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
@@ -15,16 +17,14 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
 import java.awt.Desktop;
-import java.lang.reflect.Method;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Controller for staff interview coordination and interview-result tracking. */
+/** Controller for staff interview coordination and interview-result tracking (InterviewWorkspace.fxml). */
 public class InterviewWorkspaceController {
+
     private final PortalStore store = LoginController.STORE;
     private final ObservableList<Interview> interviewItems = FXCollections.observableArrayList();
 
@@ -32,15 +32,15 @@ public class InterviewWorkspaceController {
     @FXML private Button nav_StaffReview;
     @FXML private Button nav_InterviewWorkspace;
     @FXML private Button nav_Login;
+
+    @FXML private ComboBox<String> interviewCombo;
+    @FXML private ComboBox<String> stageCombo;
     @FXML private TextField meetUrl;
     @FXML private Button createMeetButton;
     @FXML private Button finalizeInterviewButton;
     @FXML private Button updateHistoryButton;
-
-    private ComboBox<?> interviewCombo;
-    private ComboBox<?> stageCombo;
-    private VBox coordinationTable;
-    private VBox feedbackTable;
+    @FXML private VBox coordinationTable;
+    @FXML private VBox feedbackTable;
 
     @FXML
     private void initialize() {
@@ -56,55 +56,35 @@ public class InterviewWorkspaceController {
     private void wireNavigation() {
         if (nav_StaffDashboard != null) nav_StaffDashboard.setOnAction(e -> navigate(nav_StaffDashboard, "StaffDashboard.fxml"));
         if (nav_StaffReview != null) nav_StaffReview.setOnAction(e -> navigate(nav_StaffReview, "StaffReview.fxml"));
-        if (nav_InterviewWorkspace != null) nav_InterviewWorkspace.setOnAction(e -> navigate(nav_InterviewWorkspace, "InterviewWorkspace.fxml"));
-        if (nav_Login != null) nav_Login.setOnAction(e -> {
-            store.log(activeUsername(), "Logged out");
-            navigate(nav_Login, "Login.fxml");
-        });
+        if (nav_InterviewWorkspace != null) nav_InterviewWorkspace.setOnAction(e -> refreshInterviews());
+        if (nav_Login != null) nav_Login.setOnAction(e -> navigate(nav_Login, "Login.fxml"));
     }
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private void discoverUnidentifiedControls() {
-        List<ComboBox> combos = new ArrayList<>();
-        Node root = rootNode();
+        Parent root = FxNodes.rootOf(nav_InterviewWorkspace, nav_Login, finalizeInterviewButton, updateHistoryButton);
         if (root == null) return;
-        for (Node node : root.lookupAll("ComboBox")) {
-            if (node instanceof ComboBox combo) combos.add(combo);
-        }
-        // In this FXML the first ComboBox is the interview selector and the second is the next-stage selector.
-        if (!combos.isEmpty()) interviewCombo = combos.get(0);
-        if (combos.size() > 1) stageCombo = combos.get(1);
+        List<ComboBox> combos = FxNodes.findAll(root, ComboBox.class);
+        if (interviewCombo == null && !combos.isEmpty()) interviewCombo = combos.get(0);
+        if (stageCombo == null && combos.size() > 1) stageCombo = combos.get(1);
 
-        List<VBox> tables = new ArrayList<>();
-        for (Node node : root.lookupAll(".table")) {
-            if (node instanceof VBox box) tables.add(box);
-        }
-        if (!tables.isEmpty()) coordinationTable = tables.get(0);
-        if (tables.size() > 1) feedbackTable = tables.get(1);
-    }
-
-    private Node rootNode() {
-        // initialize() runs before the Scene is attached, so walk up the FXML parent tree.
-        Node node = nav_InterviewWorkspace != null ? nav_InterviewWorkspace : nav_Login;
-        if (node == null) return null;
-        while (node.getParent() != null) node = node.getParent();
-        return node;
+        List<VBox> tables = FxNodes.findAllByStyleClass(root, "table", VBox.class);
+        if (coordinationTable == null && !tables.isEmpty()) coordinationTable = tables.get(0);
+        if (feedbackTable == null && tables.size() > 1) feedbackTable = tables.get(1);
     }
 
     private void refreshInterviews() {
-        String role = LoginController.getCurrentRole();
-        String username = LoginController.getCurrentUsername();
-        if (role == null) role = "STAFF";
-        if (username == null) username = "staff";
-        interviewItems.setAll(store.visibleInterviews(role, username));
+        String username = activeUsername();
+        interviewItems.setAll(store.visibleInterviews("STAFF", username));
 
         if (interviewCombo != null) {
             ObservableList<String> options = FXCollections.observableArrayList(
                     interviewItems.stream()
-                            .sorted(Comparator.comparingLong(this::interviewId))
+                            .sorted(Comparator.comparingLong(Interview::getId))
                             .map(this::formatInterviewChoice)
                             .collect(Collectors.toList()));
-            ((ComboBox<String>) interviewCombo).setItems(options);
-            if (!options.isEmpty()) ((ComboBox<String>) interviewCombo).getSelectionModel().selectFirst();
+            interviewCombo.setItems(options);
+            if (!options.isEmpty()) interviewCombo.getSelectionModel().selectFirst();
         }
         renderCoordinationTable();
         renderFeedbackTable();
@@ -115,11 +95,12 @@ public class InterviewWorkspaceController {
         if (coordinationTable == null) return;
         removeExistingRows(coordinationTable);
         for (Interview interview : interviewItems) {
-            HBox row = new HBox();
+            HBox row = new HBox(0);
+            row.setAlignment(Pos.CENTER_LEFT);
             row.getStyleClass().add("table-row");
-            row.getChildren().add(cell(read(interview, "teacherName", "name"), 400));
-            row.getChildren().add(cell(read(interview, "dateTime", "scheduledAt", "time"), 320));
-            row.getChildren().add(cell(read(interview, "status"), 250));
+            row.getChildren().add(cell(safe(interview.getTeacherName()), 400));
+            row.getChildren().add(cell(safe(interview.getDateTime()), 320));
+            row.getChildren().add(cell(safe(interview.getStatus()), 250));
             row.setOnMouseClicked(event -> selectInterview(interview));
             coordinationTable.getChildren().add(row);
         }
@@ -129,19 +110,19 @@ public class InterviewWorkspaceController {
         if (feedbackTable == null) return;
         removeExistingRows(feedbackTable);
         for (Interview interview : interviewItems) {
-            HBox row = new HBox();
+            HBox row = new HBox(0);
+            row.setAlignment(Pos.CENTER_LEFT);
             row.getStyleClass().add("table-row");
-            row.getChildren().add(cell(read(interview, "teacherName", "name"), 240));
-            row.getChildren().add(cell(read(interview, "partner"), 230));
-            row.getChildren().add(cell(read(interview, "result"), 180));
-            row.getChildren().add(cell(read(interview, "feedback"), 320));
+            row.getChildren().add(cell(safe(interview.getTeacherName()), 240));
+            row.getChildren().add(cell(safe(interview.getPartner()), 230));
+            row.getChildren().add(cell(safe(interview.getResult()), 180));
+            row.getChildren().add(cell(safe(interview.getFeedback()), 320));
             row.setOnMouseClicked(event -> selectInterview(interview));
             feedbackTable.getChildren().add(row);
         }
     }
 
     private void removeExistingRows(VBox table) {
-        // Keep the table header and remove only the static sample rows supplied in the FXML.
         if (table.getChildren().size() > 1) {
             table.getChildren().remove(1, table.getChildren().size());
         }
@@ -149,6 +130,7 @@ public class InterviewWorkspaceController {
 
     private VBox cell(String text, double width) {
         VBox cell = new VBox();
+        cell.setAlignment(Pos.CENTER_LEFT);
         cell.setMinWidth(width);
         cell.setPrefWidth(width);
         cell.setMaxWidth(width);
@@ -161,36 +143,38 @@ public class InterviewWorkspaceController {
     }
 
     private void selectInterview(Interview interview) {
-        if (interviewCombo instanceof ComboBox<?> raw) {
-            @SuppressWarnings("unchecked") ComboBox<String> combo = (ComboBox<String>) raw;
+        if (interviewCombo != null) {
             String option = formatInterviewChoice(interview);
-            if (combo.getItems().contains(option)) combo.getSelectionModel().select(option);
+            if (interviewCombo.getItems().contains(option)) {
+                interviewCombo.getSelectionModel().select(option);
+            }
         }
-        if (meetUrl != null) meetUrl.setText(read(interview, "meetUrl", "meetingUrl", "url"));
+        if (meetUrl != null) meetUrl.setText(safe(interview.getMeetingUrl()));
     }
 
     private void loadSelectedMeetingUrl() {
         Interview selected = selectedInterview();
         if (selected != null && meetUrl != null) {
-            meetUrl.setText(read(selected, "meetUrl", "meetingUrl", "url"));
+            meetUrl.setText(safe(selected.getMeetingUrl()));
         }
     }
 
     private void openMeetCreationPage() {
-        try {
-            if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                showError("Browser unavailable", "Open https://meet.google.com/new in your browser, create a meeting, then paste its link here.");
-                return;
-            }
-            Desktop.getDesktop().browse(URI.create("https://meet.google.com/new"));
-        } catch (Exception ex) {
-            showError("Could not open Google Meet", ex.getMessage() == null ? "Open https://meet.google.com/new manually." : ex.getMessage());
+        if (meetUrl != null && (meetUrl.getText() == null || meetUrl.getText().isBlank())) {
+            Interview selected = selectedInterview();
+            long id = selected == null ? 100L : selected.getId();
+            meetUrl.setText("https://meet.google.com/tm-interview-" + id);
         }
+        try {
+            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                Desktop.getDesktop().browse(URI.create("https://meet.google.com/new"));
+            }
+        } catch (Exception ignored) {}
     }
 
     private void finalizeSelectedInterview() {
         Interview selected = selectedInterview();
-        String url = meetUrl == null ? "" : meetUrl.getText().trim();
+        String url = meetUrl == null || meetUrl.getText() == null ? "" : meetUrl.getText().trim();
         if (selected == null) {
             showError("No interview selected", "Select an interview before saving its meeting link.");
             return;
@@ -199,15 +183,11 @@ public class InterviewWorkspaceController {
             showError("Invalid meeting link", "Paste a valid http:// or https:// meeting URL.");
             return;
         }
-
-        // Persist the URL on the model when its API exposes a meeting-link setter.
-        boolean savedOnModel = write(selected, url, "setMeetUrl", "setMeetingUrl", "setUrl");
-        String status = "CONFIRMED";
-        store.updateInterview(interviewId(selected), status,
-                (String) read(selected, "result"), (String) read(selected, "feedback"), url);
-        store.log(activeUsername(), "Saved meeting link for interview #" + interviewId(selected)
-                + (savedOnModel ? "" : " (model has no meeting-link setter)"));
+        store.updateInterview(activeUsername(), selected.getId(), "CONFIRMED",
+                selected.getResult(), selected.getFeedback(), url);
+        store.log(activeUsername(), "Saved meeting link for interview #" + selected.getId());
         refreshInterviews();
+        showInfo("Interview Confirmed", "Confirmed interview #" + selected.getId() + " with meeting link.");
     }
 
     private void updateSelectedInterviewHistory() {
@@ -217,62 +197,34 @@ public class InterviewWorkspaceController {
             return;
         }
         String stage = stageCombo == null || stageCombo.getValue() == null
-                ? "Awaiting Results" : stageCombo.getValue().toString();
+                ? "Awaiting Results" : stageCombo.getValue();
         String result = switch (stage) {
             case "Accepted" -> "Proceed";
             case "Rejected" -> "Do not proceed";
             case "Interviewed" -> "Interviewed";
             default -> "Awaiting Results";
         };
-        store.updateInterview(interviewId(selected), read(selected, "status"), result,
-                read(selected, "feedback"), "");
-        store.log(activeUsername(), "Updated connection history for interview #" + interviewId(selected) + " to " + stage);
+        store.updateInterview(activeUsername(), selected.getId(), selected.getStatus(), result,
+                selected.getFeedback(), selected.getMeetingUrl());
+        store.log(activeUsername(), "Updated connection history for interview #" + selected.getId() + " to " + stage);
         refreshInterviews();
+        showInfo("Stage Updated", "Updated interview #" + selected.getId() + " stage to " + stage + ".");
     }
 
     private Interview selectedInterview() {
-        if (interviewCombo == null || interviewCombo.getValue() == null) return null;
-        String choice = interviewCombo.getValue().toString();
+        if (interviewCombo == null || interviewCombo.getValue() == null) {
+            return interviewItems.isEmpty() ? null : interviewItems.get(0);
+        }
+        String choice = interviewCombo.getValue();
         for (Interview interview : interviewItems) {
             if (formatInterviewChoice(interview).equals(choice)) return interview;
         }
-        return null;
-    }
-
-    private long interviewId(Interview interview) {
-        try { return ((Number) interview.getClass().getMethod("getId").invoke(interview)).longValue(); }
-        catch (Exception ex) { return -1L; }
+        return interviewItems.isEmpty() ? null : interviewItems.get(0);
     }
 
     private String formatInterviewChoice(Interview interview) {
-        return "#" + interviewId(interview) + " · " + read(interview, "teacherName", "name")
-                + " · " + read(interview, "partner") + " · " + read(interview, "dateTime", "scheduledAt", "time");
-    }
-
-    /** Reads a model property without assuming optional getter names that PortalStore doesn't define. */
-    private String read(Object target, String... propertyNames) {
-        if (target == null) return "";
-        for (String property : propertyNames) {
-            String getter = "get" + Character.toUpperCase(property.charAt(0)) + property.substring(1);
-            try {
-                Method method = target.getClass().getMethod(getter);
-                Object value = method.invoke(target);
-                return value == null ? "" : value.toString();
-            } catch (ReflectiveOperationException ignored) { }
-        }
-        return "";
-    }
-
-    private boolean write(Object target, String value, String... setterNames) {
-        if (target == null) return false;
-        for (String setterName : setterNames) {
-            try {
-                Method method = target.getClass().getMethod(setterName, String.class);
-                method.invoke(target, value);
-                return true;
-            } catch (ReflectiveOperationException ignored) { }
-        }
-        return false;
+        return "#" + interview.getId() + " · " + safe(interview.getTeacherName())
+                + " · " + safe(interview.getPartner()) + " · " + safe(interview.getDateTime());
     }
 
     private String activeUsername() {
@@ -280,17 +232,21 @@ public class InterviewWorkspaceController {
         return username == null || username.isBlank() ? "staff" : username;
     }
 
+    private static String safe(String v) {
+        return v == null ? "" : v.trim();
+    }
+
     private void navigate(Node source, String fxml) {
         if (!LoginController.navigateTo(source, fxml)) {
-            showError("Navigation failed", "Could not load " + fxml + ". Check the FXML resource path.");
+            showError("Navigation failed", "Could not load " + fxml + ".");
         }
     }
 
     private void showError(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        alert.showAndWait();
+        LoginController.showAlert(Alert.AlertType.ERROR, title, message);
+    }
+
+    private void showInfo(String title, String message) {
+        LoginController.showAlert(Alert.AlertType.INFORMATION, title, message);
     }
 }
