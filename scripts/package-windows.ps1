@@ -1,6 +1,6 @@
 param(
-    [ValidateSet("msi", "exe", "both")]
-    [string]$InstallerType = "both",
+    [ValidateSet("msi", "exe", "app-image", "all")]
+    [string]$InstallerType = "all",
     [string]$AppVersion = "1.0.0",
     [switch]$SkipTests
 )
@@ -45,9 +45,9 @@ if (-not (Get-Command "candle.exe" -ErrorAction SilentlyContinue)) {
 
 Write-Host "Building application and copying runtime dependencies with Maven..."
 if ($SkipTests) {
-    & $mvnCmd package -DskipTests
+    & $mvnCmd compile package -DskipTests
 } else {
-    & $mvnCmd package
+    & $mvnCmd test-compile test package
 }
 if ($LASTEXITCODE -ne 0) {
     throw "Maven package failed with exit code $LASTEXITCODE"
@@ -61,9 +61,57 @@ $distDir = Join-Path $ProjectRoot "dist"
 New-Item -ItemType Directory -Force -Path $distDir | Out-Null
 
 $jpackageExe = Join-Path $env:JAVA_HOME "bin\jpackage.exe"
-$typesToBuild = if ($InstallerType -eq "both") { @("msi", "exe") } else { @($InstallerType) }
+$signScript = Join-Path $PSScriptRoot "sign-windows.ps1"
 
-foreach ($type in $typesToBuild) {
+# 1. Build self-contained app-image first (used both for Portable ZIP and to sign TeacherMatch.exe)
+$appImageRoot = Join-Path $env:TEMP "tmver36-app-image"
+if (Test-Path $appImageRoot) {
+    Remove-Item $appImageRoot -Recurse -Force
+}
+New-Item -ItemType Directory -Force -Path $appImageRoot | Out-Null
+
+Write-Host "Running jpackage for self-contained app-image..."
+& $jpackageExe `
+    --type app-image `
+    --name "TeacherMatch" `
+    --app-version $AppVersion `
+    --vendor "TeacherMatch" `
+    --description "TeacherMatch Desktop Application (TMver36)" `
+    --dest $appImageRoot `
+    --input $inputDir `
+    --main-jar "TMver36-1.0-SNAPSHOT.jar" `
+    --main-class "com.example.tmver36.Launcher" `
+    --add-modules "java.base,java.desktop,java.xml,java.logging,java.scripting,java.naming,java.prefs,java.datatransfer,jdk.unsupported"
+if ($LASTEXITCODE -ne 0) {
+    throw "jpackage failed for app-image with exit code $LASTEXITCODE"
+}
+
+$appImageDir = Join-Path $appImageRoot "TeacherMatch"
+$appExe = Join-Path $appImageDir "TeacherMatch.exe"
+
+# Create 1-click launcher and README inside the portable folder
+$runBat = "@echo off`r`ncd /d `"%~dp0`"`r`nstart `"`" `"%~dp0TeacherMatch.exe`"`r`n"
+Set-Content -Path (Join-Path $appImageDir "Run-TeacherMatch.bat") -Value $runBat -Encoding ASCII
+
+# Sign TeacherMatch.exe inside app-image before zipping and packaging
+& $signScript -FilesToSign @($appExe) -CertOutputDir $distDir
+
+# Create Portable ZIP (TeacherMatch-1.0.0-win64-portable.zip)
+$portableZip = Join-Path $distDir "TeacherMatch-$AppVersion-win64-portable.zip"
+if (Test-Path $portableZip) {
+    Remove-Item $portableZip -Force
+}
+Write-Host "Creating Portable ZIP: $portableZip ..."
+Compress-Archive -Path $appImageDir -DestinationPath $portableZip -Force
+
+# 2. Build .msi and .exe installers from the signed app-image
+$installerTypes = switch ($InstallerType) {
+    "all"       { @("msi", "exe") }
+    "app-image" { @() }
+    default     { @($InstallerType) }
+}
+
+foreach ($type in $installerTypes) {
     Write-Host "Running jpackage for installer type: $type ..."
     $existing = Join-Path $distDir "TeacherMatch-$AppVersion.$type"
     if (Test-Path $existing) {
@@ -76,10 +124,7 @@ foreach ($type in $typesToBuild) {
         --vendor "TeacherMatch" `
         --description "TeacherMatch Desktop Application (TMver36)" `
         --dest $distDir `
-        --input $inputDir `
-        --main-jar "TMver36-1.0-SNAPSHOT.jar" `
-        --main-class "com.example.tmver36.Launcher" `
-        --add-modules "java.base,java.desktop,java.xml,java.logging,java.scripting,java.naming,java.prefs,java.datatransfer,jdk.unsupported" `
+        --app-image $appImageDir `
         --win-per-user-install `
         --win-dir-chooser `
         --win-menu `
@@ -88,7 +133,26 @@ foreach ($type in $typesToBuild) {
     if ($LASTEXITCODE -ne 0) {
         throw "jpackage failed for type $type with exit code $LASTEXITCODE"
     }
+    & $signScript -FilesToSign @($existing) -CertOutputDir $distDir
 }
 
-Write-Host "Windows installers created successfully in ${distDir}:"
-Get-ChildItem -Path $distDir -Filter "TeacherMatch-*" | Select-Object Name, Length, LastWriteTime
+# Create 1-click Install-TeacherMatch.bat in dist/ that imports the certificate for the current user and launches the MSI
+$installBat = @"
+@echo off
+setlocal
+cd /d "%~dp0"
+if exist "%~dp0TeacherMatch-CodeSigning.cer" (
+    certutil -user -addstore Root "%~dp0TeacherMatch-CodeSigning.cer" >nul 2>&1
+    certutil -user -addstore TrustedPublisher "%~dp0TeacherMatch-CodeSigning.cer" >nul 2>&1
+)
+if exist "%~dp0TeacherMatch-$AppVersion.msi" (
+    echo Installing TeacherMatch $AppVersion ...
+    msiexec /i "%~dp0TeacherMatch-$AppVersion.msi"
+) else if exist "%~dp0TeacherMatch-$AppVersion.exe" (
+    start "" "%~dp0TeacherMatch-$AppVersion.exe"
+)
+"@
+Set-Content -Path (Join-Path $distDir "Install-TeacherMatch.bat") -Value $installBat -Encoding ASCII
+
+Write-Host "Windows distributables created and signed in ${distDir}:"
+Get-ChildItem -Path $distDir | Select-Object Name, Length, LastWriteTime

@@ -12,7 +12,12 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -217,31 +222,33 @@ public class PortalStore {
                     LocalDateTime.of(secondSlotDate, LocalTime.of(16, 0))
             ));
 
-            // Demo interviews
+            // Demo interviews with live auto-generated working meeting room URLs
+            String firstDateTime = LocalDate.now().plusDays(2).atTime(10, 0).toString();
             Interview firstInterview = new Interview(
                     1,
                     1,
                     "Emily Martin",
                     "Bright English Center",
-                    LocalDate.now().plusDays(2).atTime(10, 0).toString(),
+                    firstDateTime,
                     "PENDING",
                     "Not reviewed",
                     "",
-                    ""
+                    generateMeetingLink(1L, "Emily Martin", "Bright English Center", firstDateTime)
             );
             firstInterview.setEndDateTime(LocalDate.now().plusDays(2).atTime(10, 30).toString());
             interviews.add(firstInterview);
 
+            String secondDateTime = LocalDate.now().plusDays(3).atTime(14, 30).toString();
             Interview secondInterview = new Interview(
                     2,
                     2,
                     "Daniel Walker",
                     "Bright English Center",
-                    LocalDate.now().plusDays(3).atTime(14, 30).toString(),
+                    secondDateTime,
                     "CONFIRMED",
                     "Not reviewed",
                     "",
-                    "https://meet.google.com/tm-daniel-bright"
+                    generateMeetingLink(2L, "Daniel Walker", "Bright English Center", secondDateTime)
             );
             secondInterview.setEndDateTime(LocalDate.now().plusDays(3).atTime(15, 0).toString());
             interviews.add(secondInterview);
@@ -537,6 +544,11 @@ public class PortalStore {
                         props.getProperty(prefix + "meetingUrl", "")
                 );
                 iv.setEndDateTime(props.getProperty(prefix + "endDateTime", ""));
+                if (iv.getMeetingUrl() == null || iv.getMeetingUrl().isBlank()
+                        || iv.getMeetingUrl().startsWith("https://meet.google.com/tm-")
+                        || iv.getMeetingUrl().equals("https://meet.google.com/abc-defg-hij")) {
+                    iv.setMeetingUrl(generateMeetingLink(iv));
+                }
                 interviews.add(iv);
                 if (id > interviewIds.get()) {
                     interviewIds.set(id);
@@ -1198,6 +1210,7 @@ public class PortalStore {
         }
 
         long newId = interviewIds.incrementAndGet();
+        String autoMeetUrl = generateMeetingLink(newId, teacher.getName(), partnerName, dateTime);
         Interview interview = new Interview(
                 newId,
                 teacherId,
@@ -1207,7 +1220,7 @@ public class PortalStore {
                 "PENDING",
                 "Not reviewed",
                 "",
-                ""
+                autoMeetUrl
         );
         interview.setEndDateTime(slot.endAt().toString());
         interviews.add(interview);
@@ -1249,7 +1262,9 @@ public class PortalStore {
             return false;
         }
         if (meetUrl != null && !meetUrl.isBlank()) {
-            interview.setMeetingUrl(meetUrl);
+            interview.setMeetingUrl(meetUrl.trim());
+        } else if (interview.getMeetingUrl() == null || interview.getMeetingUrl().isBlank()) {
+            interview.setMeetingUrl(generateMeetingLink(interview));
         }
         if (status != null && !status.isBlank()) {
             interview.setStatus(status);
@@ -1297,6 +1312,86 @@ public class PortalStore {
         log(username, "Submitted feedback for interview #" + interviewId + ": " + result);
         saveState();
         return true;
+    }
+
+    public static String generateMeetingLink(Interview interview) {
+        if (interview == null) {
+            return "https://meet.jit.si/TeacherMatch-LiveRoom";
+        }
+        return generateMeetingLink(
+                interview.getId(),
+                interview.getTeacherName(),
+                interview.getPartner(),
+                interview.getDateTime()
+        );
+    }
+
+    public static String generateMeetingLink(long interviewId, String teacherName, String partnerName, String dateTime) {
+        String teacherSlug = slugify(teacherName, "Teacher");
+        String partnerSlug = slugify(partnerName, "Partner");
+        String seed = interviewId + "|" + nn(teacherName).trim().toLowerCase(Locale.ROOT)
+                + "|" + nn(partnerName).trim().toLowerCase(Locale.ROOT)
+                + "|" + nn(dateTime).trim();
+        String token = shortHash(seed, 10);
+        return "https://meet.jit.si/TeacherMatch-" + interviewId + "-" + teacherSlug + "-" + partnerSlug + "-" + token;
+    }
+
+    public static boolean openInBrowser(String url) {
+        if (url == null || url.isBlank()) {
+            return false;
+        }
+        String trimmed = url.trim();
+        if (!(trimmed.startsWith("https://") || trimmed.startsWith("http://"))) {
+            return false;
+        }
+        if (Boolean.getBoolean("tm.test.suppressAlerts")) {
+            return true;
+        }
+        try {
+            if (java.awt.Desktop.isDesktopSupported()
+                    && java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.BROWSE)) {
+                java.awt.Desktop.getDesktop().browse(java.net.URI.create(trimmed));
+                return true;
+            }
+        } catch (Exception ignored) {
+        }
+        try {
+            String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+            if (os.contains("win")) {
+                new ProcessBuilder("rundll32", "url.dll,FileProtocolHandler", trimmed).start();
+                return true;
+            } else if (os.contains("mac")) {
+                new ProcessBuilder("open", trimmed).start();
+                return true;
+            } else {
+                new ProcessBuilder("xdg-open", trimmed).start();
+                return true;
+            }
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private static String slugify(String input, String fallback) {
+        if (input == null || input.isBlank()) {
+            return fallback;
+        }
+        String cleaned = input.trim().replaceAll("[^A-Za-z0-9]+", "");
+        if (cleaned.isEmpty()) {
+            return fallback;
+        }
+        return cleaned.length() > 14 ? cleaned.substring(0, 14) : cleaned;
+    }
+
+    private static String shortHash(String input, int length) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(input.getBytes(StandardCharsets.UTF_8));
+            String hex = HexFormat.of().formatHex(digest);
+            return hex.substring(0, Math.min(length, hex.length()));
+        } catch (NoSuchAlgorithmException ex) {
+            return Integer.toHexString(Math.abs(input.hashCode()));
+        }
     }
 
     private Interview findInterview(long id) {

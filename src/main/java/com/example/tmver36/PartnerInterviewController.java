@@ -14,6 +14,8 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
@@ -214,11 +216,9 @@ public class PartnerInterviewController {
             row.getChildren().add(cell(safe(interview.getTeacherName()), 210));
             row.getChildren().add(cell(formatDateTime(safe(interview.getDateTime())), 260));
             row.getChildren().add(cell(safe(interview.getStatus()), 250));
-            String meetUrl = "CONFIRMED".equalsIgnoreCase(interview.getStatus())
-                    && interview.getMeetingUrl() != null
-                    && !interview.getMeetingUrl().isBlank()
+            String meetUrl = interview.getMeetingUrl() != null && !interview.getMeetingUrl().isBlank()
                     ? interview.getMeetingUrl()
-                    : "Awaiting confirmation";
+                    : PortalStore.generateMeetingLink(interview);
             row.getChildren().add(cell(meetUrl, 250));
             requestsTable.getChildren().add(row);
         }
@@ -242,13 +242,28 @@ public class PartnerInterviewController {
         try {
             String selected = interviewSelector == null ? null : interviewSelector.getValue();
             Interview interview = selected == null ? null : findInterviewFromLabel(selected);
-            String meetUrl = interview == null ? "" : interview.getMeetingUrl();
-            if (meetUrl == null || meetUrl.isBlank()) {
-                showError("Meeting link unavailable", "The selected interview does not have a meeting link yet.");
+            if (interview == null) {
+                List<Interview> visible = STORE.visibleInterviews("PARTNER", currentPartner());
+                if (!visible.isEmpty()) {
+                    interview = visible.get(0);
+                }
+            }
+            if (interview == null) {
+                showError("No interview available", "Request or select an interview first.");
                 return;
             }
-            if (Desktop.isDesktopSupported()) {
-                Desktop.getDesktop().browse(new URI(meetUrl));
+            String meetUrl = safe(interview.getMeetingUrl());
+            if (meetUrl.isBlank()) {
+                meetUrl = PortalStore.generateMeetingLink(interview);
+            }
+            try {
+                ClipboardContent content = new ClipboardContent();
+                content.putString(meetUrl);
+                Clipboard.getSystemClipboard().setContent(content);
+            } catch (Exception ignored) {
+            }
+            if (!PortalStore.openInBrowser(meetUrl)) {
+                showError("Could not open meeting room", "Please open this URL in your browser:\n" + meetUrl);
             }
         } catch (Exception ex) {
             showError("Could not open Meet", ex.getMessage());

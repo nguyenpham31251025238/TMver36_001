@@ -193,18 +193,24 @@ class FxmlAndNavigationTest {
             int afterCount = LoginController.STORE.visibleInterviews("PARTNER", "partner").size();
             assertTrue(afterCount > beforeCount, "Partner should be able to request an interview from available slots");
 
-            // 4. InterviewWorkspaceController confirm meeting URL
+            // 4. InterviewWorkspaceController auto-generates & confirms live meeting URL
             LoginController.setCurrentSession("staff", "STAFF");
             FXMLLoader workspaceLoader = new FXMLLoader(HelloApplication.class.getResource("InterviewWorkspace.fxml"));
             Parent workspaceRoot = workspaceLoader.load();
             new Scene(workspaceRoot, 1280, 820);
             InterviewWorkspaceController workspaceCtrl = workspaceLoader.getController();
             TextField meetUrl = getField(workspaceCtrl, "meetUrl", TextField.class);
+            Button createMeetButton = getField(workspaceCtrl, "createMeetButton", Button.class);
             Button finalizeInterviewButton = getField(workspaceCtrl, "finalizeInterviewButton", Button.class);
-            meetUrl.setText("https://meet.google.com/tm-verified-room");
+            meetUrl.setText("");
+            createMeetButton.fire();
+            String autoUrl = meetUrl.getText();
+            assertNotNull(autoUrl);
+            assertTrue(autoUrl.startsWith("https://meet.jit.si/TeacherMatch-"),
+                    "createMeetButton should auto-generate a live room URL when blank, got: " + autoUrl);
             finalizeInterviewButton.fire();
             assertTrue(LoginController.STORE.interviews().stream()
-                    .anyMatch(i -> "https://meet.google.com/tm-verified-room".equals(i.getMeetingUrl())
+                    .anyMatch(i -> autoUrl.equals(i.getMeetingUrl())
                             && "CONFIRMED".equals(i.getStatus())));
 
             // 5. AdminAccountsController create a new Teacher account & verify automatic profile linking

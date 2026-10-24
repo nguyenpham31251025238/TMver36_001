@@ -16,6 +16,8 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
@@ -327,11 +329,15 @@ public class TeacherScheduleController {
         }
         Interview first = confirmed.get(0);
         if (detail != null) detail.setText(safe(first.getPartner()) + " · " + formatDateTime(first.getDateTime()) + " · CONFIRMED");
+        String url = safe(first.getMeetingUrl());
+        if (url.isBlank()) {
+            url = PortalStore.generateMeetingLink(first);
+        }
         if (meetLinkField != null) {
-            meetLinkField.setText(safe(first.getMeetingUrl()));
+            meetLinkField.setText(url);
         }
         if (openMeetButton != null) {
-            openMeetButton.setDisable(meetLinkField == null || safe(meetLinkField.getText()).isBlank());
+            openMeetButton.setDisable(false);
         }
     }
 
@@ -352,6 +358,15 @@ public class TeacherScheduleController {
     private void openMeetLink() {
         String url = meetLinkField == null ? "" : safe(meetLinkField.getText());
         if (url.isBlank()) {
+            List<Interview> visible = STORE.visibleInterviews("TEACHER", currentUsername());
+            if (!visible.isEmpty()) {
+                url = PortalStore.generateMeetingLink(visible.get(0));
+                if (meetLinkField != null) {
+                    meetLinkField.setText(url);
+                }
+            }
+        }
+        if (url.isBlank()) {
             setMessage("No meeting link is available for this interview yet.");
             return;
         }
@@ -361,9 +376,14 @@ public class TeacherScheduleController {
                 setMessage("The meeting link must begin with http:// or https://.");
                 return;
             }
-            if (Desktop.isDesktopSupported()) {
-                Desktop.getDesktop().browse(uri);
+            try {
+                ClipboardContent content = new ClipboardContent();
+                content.putString(url);
+                Clipboard.getSystemClipboard().setContent(content);
+            } catch (Exception ignored) {
             }
+            PortalStore.openInBrowser(url);
+            setMessage("Opened and copied meeting link: " + url);
         } catch (Exception ex) {
             setMessage("Could not open the meeting link: " + ex.getMessage());
         }

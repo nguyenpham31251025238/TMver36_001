@@ -13,6 +13,8 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
@@ -149,45 +151,75 @@ public class InterviewWorkspaceController {
                 interviewCombo.getSelectionModel().select(option);
             }
         }
-        if (meetUrl != null) meetUrl.setText(safe(interview.getMeetingUrl()));
+        if (meetUrl != null) {
+            String url = safe(interview.getMeetingUrl());
+            if (url.isBlank()) {
+                url = PortalStore.generateMeetingLink(interview);
+            }
+            meetUrl.setText(url);
+        }
     }
 
     private void loadSelectedMeetingUrl() {
         Interview selected = selectedInterview();
         if (selected != null && meetUrl != null) {
-            meetUrl.setText(safe(selected.getMeetingUrl()));
+            String url = safe(selected.getMeetingUrl());
+            if (url.isBlank()) {
+                url = PortalStore.generateMeetingLink(selected);
+            }
+            meetUrl.setText(url);
         }
     }
 
     private void openMeetCreationPage() {
-        if (meetUrl != null && (meetUrl.getText() == null || meetUrl.getText().isBlank())) {
-            Interview selected = selectedInterview();
-            long id = selected == null ? 100L : selected.getId();
-            meetUrl.setText("https://meet.google.com/tm-interview-" + id);
-        }
-        try {
-            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                Desktop.getDesktop().browse(URI.create("https://meet.google.com/new"));
+        Interview selected = selectedInterview();
+        String url = meetUrl == null ? "" : safe(meetUrl.getText());
+        if (url.isBlank() || url.startsWith("https://meet.google.com/tm-") || "https://meet.google.com/new".equalsIgnoreCase(url)) {
+            url = PortalStore.generateMeetingLink(selected);
+            if (meetUrl != null) {
+                meetUrl.setText(url);
             }
-        } catch (Exception ignored) {}
+        }
+        if (selected != null) {
+            store.updateInterview(activeUsername(), selected.getId(), selected.getStatus(),
+                    selected.getResult(), selected.getFeedback(), url);
+        }
+        copyToClipboard(url);
+        PortalStore.openInBrowser(url);
     }
 
     private void finalizeSelectedInterview() {
         Interview selected = selectedInterview();
-        String url = meetUrl == null || meetUrl.getText() == null ? "" : meetUrl.getText().trim();
         if (selected == null) {
             showError("No interview selected", "Select an interview before saving its meeting link.");
             return;
         }
-        if (!(url.startsWith("https://") || url.startsWith("http://"))) {
-            showError("Invalid meeting link", "Paste a valid http:// or https:// meeting URL.");
-            return;
+        String url = meetUrl == null || meetUrl.getText() == null ? "" : meetUrl.getText().trim();
+        if (url.isBlank()) {
+            url = safe(selected.getMeetingUrl());
+        }
+        if (url.isBlank() || !(url.startsWith("https://") || url.startsWith("http://"))) {
+            url = PortalStore.generateMeetingLink(selected);
+            if (meetUrl != null) {
+                meetUrl.setText(url);
+            }
         }
         store.updateInterview(activeUsername(), selected.getId(), "CONFIRMED",
                 selected.getResult(), selected.getFeedback(), url);
-        store.log(activeUsername(), "Saved meeting link for interview #" + selected.getId());
+        store.log(activeUsername(), "Saved meeting link for interview #" + selected.getId() + ": " + url);
+        copyToClipboard(url);
         refreshInterviews();
-        showInfo("Interview Confirmed", "Confirmed interview #" + selected.getId() + " with meeting link.");
+        showInfo("Interview Confirmed", "Confirmed interview #" + selected.getId() + " with live room link:\n" + url);
+    }
+
+    private void copyToClipboard(String text) {
+        if (text == null || text.isBlank()) return;
+        try {
+            ClipboardContent content = new ClipboardContent();
+            content.putString(text);
+            Clipboard.getSystemClipboard().setContent(content);
+        } catch (Exception ignored) {
+        }
     }
 
     private void updateSelectedInterviewHistory() {

@@ -119,6 +119,9 @@ class PortalStoreTest {
                 .orElse(null);
         assertNotNull(booked);
         assertEquals("PENDING", booked.getStatus());
+        assertNotNull(booked.getMeetingUrl(), "Booked interview must immediately have an auto-generated meeting room URL");
+        assertTrue(booked.getMeetingUrl().startsWith("https://meet.jit.si/TeacherMatch-" + booked.getId() + "-"),
+                "Auto-generated meeting URL must be a unique Jitsi room URL: " + booked.getMeetingUrl());
 
         // Staff confirms interview with Meet link
         String meetLink = "https://meet.google.com/tm-emily-test";
