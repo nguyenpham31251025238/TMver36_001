@@ -5,6 +5,12 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.Hyperlink;
+import javafx.scene.control.Label;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextArea;
@@ -226,6 +232,102 @@ class FxmlAndNavigationTest {
             getField(accountsCtrl, "saveAccountButton", Button.class).fire();
             assertNotNull(LoginController.STORE.authenticate("teacher_ui", "uiPass123"));
             assertNotNull(LoginController.STORE.teacherForUser("teacher_ui"));
+        });
+    }
+
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void feedbackItemsUiVerification() throws Exception {
+        runOnFxThread(() -> {
+            LoginController.STORE.resetToSeedData();
+
+            // 1. Verify zero horizontal scrollbars across all 13 business screens
+            for (String fxml : ALL_FXML_FILES) {
+                FXMLLoader l = new FXMLLoader(LoginController.class.getResource(fxml));
+                Parent r = l.load();
+                for (ScrollPane sp : FxNodes.findAll(r, ScrollPane.class)) {
+                    assertTrue(sp.isFitToWidth(), fxml + " ScrollPane must have fitToWidth=true");
+                    assertEquals(ScrollPane.ScrollBarPolicy.NEVER, sp.getHbarPolicy(),
+                            fxml + " ScrollPane must have hbarPolicy=NEVER to prevent horizontal overflow");
+                }
+            }
+
+            // 2. Verify Remember Me checkbox & session token persistence on Login.fxml
+            LoginController.clearSession();
+            FXMLLoader loginLoader = new FXMLLoader(LoginController.class.getResource("Login.fxml"));
+            Parent loginRoot = loginLoader.load();
+            new Scene(loginRoot, 1280, 800);
+            LoginController loginCtrl = loginLoader.getController();
+            CheckBox rememberMe = getField(loginCtrl, "rememberMeCheck", CheckBox.class);
+            assertNotNull(rememberMe, "Login.fxml must wire rememberMeCheck");
+            getField(loginCtrl, "emailField", TextField.class).setText("staff");
+            getField(loginCtrl, "passwordField", PasswordField.class).setText("staff123");
+            getField(loginCtrl, "demoRole", ComboBox.class).setValue("Matching Staff");
+            rememberMe.setSelected(true);
+            getField(loginCtrl, "loginButton", Button.class).fire();
+            assertEquals("staff", LoginController.getCurrentUsername());
+
+            // Reload Login.fxml while session file exists -> should restore credentials / session
+            FXMLLoader loginLoader2 = new FXMLLoader(LoginController.class.getResource("Login.fxml"));
+            loginLoader2.load();
+            LoginController loginCtrl2 = loginLoader2.getController();
+            assertTrue(getField(loginCtrl2, "rememberMeCheck", CheckBox.class).isSelected(),
+                    "Remember Me should remain checked after reload when enabled");
+
+            // 3. Verify StaffDashboard live KPI metrics, standardized filters, and Shopee-inspired Card Grid
+            LoginController.setCurrentSession("staff", "STAFF");
+            FXMLLoader staffDashLoader = new FXMLLoader(LoginController.class.getResource("StaffDashboard.fxml"));
+            Parent staffDashRoot = staffDashLoader.load();
+            new Scene(staffDashRoot, 1280, 800);
+            StaffDashboardController staffDashCtrl = staffDashLoader.getController();
+            Label readyKpi = getField(staffDashCtrl, "readyMetricLabel", Label.class);
+            Label pendingKpi = getField(staffDashCtrl, "pendingMetricLabel", Label.class);
+            Label interviewsKpi = getField(staffDashCtrl, "interviewMetricLabel", Label.class);
+            assertNotEquals("24", readyKpi.getText(), "Ready KPI must be dynamically computed from PortalStore, not hardcoded 24");
+            assertEquals("02", readyKpi.getText(), "Seeded store has 2 Ready (qEP) teachers");
+            assertEquals("01", pendingKpi.getText(), "Seeded store has 1 Pending (qCV) teacher");
+            assertEquals("02", interviewsKpi.getText(), "Seeded store has 2 interviews");
+
+            ComboBox<String> statusFilter = getField(staffDashCtrl, "statusFilter", ComboBox.class);
+            assertTrue(statusFilter.getItems().containsAll(List.of("All", "qCV", "qEP", "Update Required")),
+                    "Status filter must replace Pending/Ready with qCV and qEP");
+            ComboBox<String> expFilter = getField(staffDashCtrl, "experienceFilter", ComboBox.class);
+            assertTrue(expFilter.getItems().containsAll(CatalogData.EXPERIENCE_OPTIONS),
+                    "Experience filter must have the 4 standardized tiers");
+            FlowPane staffGrid = getField(staffDashCtrl, "cardGridPane", FlowPane.class);
+            assertEquals(3, staffGrid.getChildren().size(), "Staff card grid should display 3 seeded teacher cards");
+
+            // 4. Verify StaffReview dynamic teacher documents, checklist persistence, and Request update (UPDATE_REQUIRED)
+            StaffReviewController.setSelectedTeacherId(2L); // Daniel Walker
+            FXMLLoader reviewLoader = new FXMLLoader(LoginController.class.getResource("StaffReview.fxml"));
+            Parent reviewRoot = reviewLoader.load();
+            new Scene(reviewRoot, 1280, 800);
+            StaffReviewController reviewCtrl = reviewLoader.getController();
+            Label candName = getField(reviewCtrl, "teacherNameLabel", Label.class);
+            assertEquals("Daniel Walker", candName.getText(), "StaffReview must display selected teacher Daniel Walker, not Emily Martin");
+            VBox docsBox = getField(reviewCtrl, "documentsTable", VBox.class);
+            assertTrue(docsBox.getChildren().size() >= 5, "Daniel Walker's documents must be dynamically rendered in StaffReview");
+
+            getField(reviewCtrl, "checkPersonalInfo", CheckBox.class).setSelected(true);
+            getField(reviewCtrl, "checkReadableCv", CheckBox.class).setSelected(false);
+            getField(reviewCtrl, "commentsArea", TextArea.class).setText("Please update your intro video lighting.");
+            getField(reviewCtrl, "requestChangesButton", Button.class).fire();
+            assertEquals("UPDATE_REQUIRED", LoginController.STORE.teacher(2L).getStatus(),
+                    "Request update button must set status to UPDATE_REQUIRED without permission errors");
+            assertEquals("Please update your intro video lighting.", LoginController.STORE.teacher(2L).getStaffFeedback());
+            assertFalse(LoginController.STORE.teacher(2L).getChecklistFlags()[1],
+                    "Checklist state must persist in PortalStore when reopening StaffReview");
+
+            // 5. Verify PartnerInterview clickable & copyable meeting link
+            LoginController.setCurrentSession("partner", "PARTNER");
+            FXMLLoader partnerIntLoader = new FXMLLoader(LoginController.class.getResource("PartnerInterview.fxml"));
+            Parent partnerIntRoot = partnerIntLoader.load();
+            new Scene(partnerIntRoot, 1280, 800);
+            PartnerInterviewController partnerIntCtrl = partnerIntLoader.getController();
+            VBox reqTable = getField(partnerIntCtrl, "requestsTable", VBox.class);
+            assertFalse(FxNodes.findAll(reqTable, Hyperlink.class).isEmpty(),
+                    "PartnerInterview Track requests table must render clickable meeting Hyperlink");
         });
     }
 

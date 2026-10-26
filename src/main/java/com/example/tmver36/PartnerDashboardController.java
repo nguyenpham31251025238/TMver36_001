@@ -1,22 +1,28 @@
 package com.example.tmver36;
 
+import com.example.tmver36.model.TeacherDocument;
 import com.example.tmver36.model.TeacherProfile;
 import com.example.tmver36.service.PortalStore;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
-import javafx.scene.Parent;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuButton;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.VBox;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 
-/** Partner shared-profiles screen backed by PortalStore (PartnerDashboard.fxml). */
+/** Partner shared-profiles screen backed by PortalStore and Shopee-inspired Profile Cards (PartnerDashboard.fxml). */
 public class PartnerDashboardController {
 
     private static final PortalStore STORE = LoginController.STORE;
@@ -29,44 +35,114 @@ public class PartnerDashboardController {
     @FXML private Button nav_PartnerProfile__3;
     @FXML private Button nav_PartnerProfile__4;
     @FXML private Button nav_PartnerInterview__2;
-    @FXML private TextField grantedSearch;
-    @FXML private Button searchGrantedButton;
 
-    private ComboBox<?> experienceFilter;
-    private Label countNote;
-    private final List<VBox> profileCards = new ArrayList<>();
+    @FXML private TextField grantedSearch;
+    @FXML private ComboBox<String> nationalityFilter;
+    @FXML private ComboBox<String> experienceFilter;
+    @FXML private MenuButton certificateMenuButton;
+    @FXML private ComboBox<String> subjectFilter;
+    @FXML private ComboBox<String> salaryFilter;
+    @FXML private Button searchGrantedButton;
+    @FXML private Button clearPartnerFiltersButton;
+    @FXML private Label countNote;
+    @FXML private FlowPane partnerCardGrid;
+
+    private final Set<String> selectedCertificates = new LinkedHashSet<>();
+    private final List<CheckMenuItem> certItems = new ArrayList<>();
+    private boolean updatingNationality;
 
     @FXML
     private void initialize() {
-        Parent root = FxNodes.rootOf(nav_PartnerDashboard, searchGrantedButton, grantedSearch);
-        if (root == null) return;
-
-        for (VBox card : FxNodes.findAllByStyleClass(root, "card", VBox.class)) {
-            if (containsTeacherName(card)) {
-                profileCards.add(card);
-            }
-        }
-        for (ComboBox<?> combo : FxNodes.findAll(root, ComboBox.class)) {
-            if (combo.getItems().stream().anyMatch(v -> String.valueOf(v).contains("years") || String.valueOf(v).contains("Experience"))) {
-                experienceFilter = combo;
-                break;
-            }
-        }
-        for (Label label : FxNodes.findAllByStyleClass(root, "note", Label.class)) {
-            if (label.getText() != null && label.getText().contains("profiles granted")) {
-                countNote = label;
-                break;
-            }
-        }
+        configureFilters();
+        bindNavigation();
 
         if (searchGrantedButton != null) searchGrantedButton.setOnAction(e -> applySearch());
-        if (grantedSearch != null) grantedSearch.setOnAction(e -> applySearch());
+        if (clearPartnerFiltersButton != null) clearPartnerFiltersButton.setOnAction(e -> resetFilters());
+        if (grantedSearch != null) {
+            grantedSearch.setOnAction(e -> applySearch());
+            grantedSearch.textProperty().addListener((obs, oldV, newV) -> applySearch());
+        }
         if (experienceFilter != null) experienceFilter.setOnAction(e -> applySearch());
+        if (subjectFilter != null) subjectFilter.setOnAction(e -> applySearch());
+        if (salaryFilter != null) salaryFilter.setOnAction(e -> applySearch());
 
-        if (nav_PartnerDashboard != null) nav_PartnerDashboard.setOnAction(e -> {
-            populateCards();
-            applySearch();
-        });
+        applySearch();
+    }
+
+    private void configureFilters() {
+        if (nationalityFilter != null) {
+            nationalityFilter.getItems().setAll(CatalogData.NATIONALITY_FILTER_OPTIONS);
+            nationalityFilter.setValue("All");
+            nationalityFilter.setEditable(true);
+            if (nationalityFilter.getEditor() != null) {
+                nationalityFilter.getEditor().textProperty().addListener((obs, oldText, newText) -> {
+                    if (updatingNationality) return;
+                    updatingNationality = true;
+                    try {
+                        nationalityFilter.getItems().setAll(CatalogData.filterCountries(newText, true));
+                        nationalityFilter.getEditor().setText(newText);
+                    } finally {
+                        updatingNationality = false;
+                    }
+                    applySearch();
+                });
+            }
+            nationalityFilter.setOnAction(e -> applySearch());
+        }
+        if (experienceFilter != null) {
+            experienceFilter.getItems().setAll(CatalogData.EXPERIENCE_FILTER_OPTIONS);
+            experienceFilter.setValue("All");
+        }
+        if (subjectFilter != null) {
+            subjectFilter.getItems().setAll(CatalogData.MAJOR_FILTER_OPTIONS);
+            subjectFilter.setValue("All");
+        }
+        if (salaryFilter != null) {
+            salaryFilter.getItems().setAll(CatalogData.EXPECTED_SALARY_FILTER_OPTIONS);
+            salaryFilter.setValue("All");
+        }
+        if (certificateMenuButton != null) {
+            certificateMenuButton.getItems().clear();
+            certItems.clear();
+            for (String cert : CatalogData.CERTIFICATE_OPTIONS) {
+                CheckMenuItem item = new CheckMenuItem(cert);
+                item.selectedProperty().addListener((obs, wasSelected, isSelected) -> {
+                    if (isSelected) selectedCertificates.add(cert);
+                    else selectedCertificates.remove(cert);
+                    certificateMenuButton.setText(selectedCertificates.isEmpty()
+                            ? "All certificates"
+                            : String.join(", ", selectedCertificates));
+                    applySearch();
+                });
+                certItems.add(item);
+                certificateMenuButton.getItems().add(item);
+            }
+        }
+    }
+
+    private void resetFilters() {
+        if (grantedSearch != null) grantedSearch.clear();
+        if (nationalityFilter != null) {
+            updatingNationality = true;
+            try {
+                nationalityFilter.getItems().setAll(CatalogData.NATIONALITY_FILTER_OPTIONS);
+                nationalityFilter.setValue("All");
+                if (nationalityFilter.getEditor() != null) nationalityFilter.getEditor().setText("All");
+            } finally {
+                updatingNationality = false;
+            }
+        }
+        if (experienceFilter != null) experienceFilter.setValue("All");
+        if (subjectFilter != null) subjectFilter.setValue("All");
+        if (salaryFilter != null) salaryFilter.setValue("All");
+        selectedCertificates.clear();
+        for (CheckMenuItem item : certItems) item.setSelected(false);
+        if (certificateMenuButton != null) certificateMenuButton.setText("All certificates");
+        applySearch();
+    }
+
+    private void bindNavigation() {
+        if (nav_PartnerDashboard != null) nav_PartnerDashboard.setOnAction(e -> applySearch());
         if (nav_PartnerProfile != null) nav_PartnerProfile.setOnAction(e -> navigate("PartnerProfile.fxml"));
         if (nav_PartnerInterview != null) nav_PartnerInterview.setOnAction(e -> navigate("PartnerInterview.fxml"));
         if (nav_PartnerInterview__2 != null) nav_PartnerInterview__2.setOnAction(e -> navigate("PartnerInterview.fxml"));
@@ -74,9 +150,6 @@ public class PartnerDashboardController {
         if (nav_PartnerProfile__2 != null) nav_PartnerProfile__2.setOnAction(e -> navigate("PartnerProfile.fxml"));
         if (nav_PartnerProfile__3 != null) nav_PartnerProfile__3.setOnAction(e -> navigate("PartnerProfile.fxml"));
         if (nav_PartnerProfile__4 != null) nav_PartnerProfile__4.setOnAction(e -> navigate("PartnerProfile.fxml"));
-
-        populateCards();
-        applySearch();
     }
 
     private String currentPartner() {
@@ -84,63 +157,94 @@ public class PartnerDashboardController {
         return (u == null || u.isBlank()) ? "partner" : u;
     }
 
-    private void populateCards() {
-        List<TeacherProfile> teachers = STORE.visibleTeachers(currentPartner(), "PARTNER");
-        for (int i = 0; i < profileCards.size(); i++) {
-            VBox card = profileCards.get(i);
-            TeacherProfile teacher = i < teachers.size() ? teachers.get(i) : null;
-            if (teacher == null) {
-                card.setVisible(false);
-                card.setManaged(false);
-                continue;
-            }
-            card.setUserData(teacher);
-            for (Label label : FxNodes.findAllByStyleClass(card, "section-title", Label.class)) {
-                label.setText(safe(teacher.getName()));
-                break;
-            }
-            setLabelByStyle(card, "muted", safe(teacher.getNationality()));
-            setLabelByStyle(card, "badge-green", safe(teacher.getCertificates()));
-            setLabelByStyle(card, "badge-gray", safe(teacher.getExperience()));
-            setLabelContainingPrefix(card, "Location", "Location: " + safe(teacher.getLocation()));
-            Button view = findButton(card, "View profile & video");
-            if (view != null) {
-                view.setOnAction(e -> {
-                    PartnerProfileController.setSelectedTeacherId(teacher.getId());
-                    navigate("PartnerProfile.fxml");
-                });
-            }
+    private void applySearch() {
+        String query = grantedSearch == null || grantedSearch.getText() == null
+                ? ""
+                : grantedSearch.getText().trim().toLowerCase(Locale.ROOT);
+        String nationality = selectedNationality();
+        String experience = selected(experienceFilter);
+        String majorOrDegree = selected(subjectFilter);
+        String salary = selected(salaryFilter);
+
+        List<TeacherProfile> visible = STORE.visibleTeachers(currentPartner(), "PARTNER");
+        List<TeacherProfile> matched = visible.stream().filter(t -> {
+            String haystack = (safe(t.getName()) + " " + safe(t.getCertificates()) + " "
+                    + safe(t.getLocation()) + " " + safe(t.getNationality()) + " "
+                    + safe(t.getDegree()) + " " + safe(t.getMajor()) + " " + safe(t.getExpectedSalary()))
+                    .toLowerCase(Locale.ROOT);
+            if (!query.isBlank() && !haystack.contains(query)) return false;
+            if (!isAll(nationality) && !safe(t.getNationality()).toLowerCase(Locale.ROOT).contains(nationality.toLowerCase(Locale.ROOT))) return false;
+            if (!CatalogData.matchesExperienceFilter(t.getExperience(), experience)) return false;
+            if (!selectedCertificates.isEmpty() && !CatalogData.matchesCertificatesFilter(t.getCertificates(), selectedCertificates)) return false;
+            if (!CatalogData.matchesMajorOrDegreeFilter(t.getDegree(), safe(t.getMajor()).isBlank() ? t.getSubject() : t.getMajor(), majorOrDegree)) return false;
+            if (!CatalogData.matchesSalaryFilter(t.getExpectedSalary(), salary)) return false;
+            return true;
+        }).collect(Collectors.toList());
+
+        renderPartnerCards(matched);
+        if (countNote != null) {
+            countNote.setText("Showing " + matched.size() + " of " + visible.size() + " shared teacher profile(s) available to this partner.");
         }
     }
 
-    private void applySearch() {
-        String query = grantedSearch == null || grantedSearch.getText() == null ? "" : grantedSearch.getText().trim().toLowerCase(Locale.ROOT);
-        String experience = experienceFilter == null || experienceFilter.getValue() == null ? "All" : String.valueOf(experienceFilter.getValue());
-        List<TeacherProfile> visible = STORE.visibleTeachers(currentPartner(), "PARTNER");
-        int shown = 0;
-        for (int i = 0; i < profileCards.size(); i++) {
-            VBox card = profileCards.get(i);
-            TeacherProfile teacher = i < visible.size() ? visible.get(i) : null;
-            boolean matches = teacher != null;
-            if (matches && !query.isBlank()) {
-                String haystack = (safe(teacher.getName()) + " "
-                        + safe(teacher.getCertificates()) + " "
-                        + safe(teacher.getLocation()) + " "
-                        + safe(teacher.getNationality())).toLowerCase(Locale.ROOT);
-                matches = haystack.contains(query);
-            }
-            if (matches && experience != null && !experience.equalsIgnoreCase("All") && !experience.isBlank()) {
-                String exp = safe(teacher.getExperience()).toLowerCase(Locale.ROOT);
-                String requested = experience.toLowerCase(Locale.ROOT).replace(" years", "").replace(" year", "").trim();
-                matches = exp.contains(requested) || requested.contains(exp);
-            }
-            card.setVisible(matches);
-            card.setManaged(matches);
-            if (matches) shown++;
+    private void renderPartnerCards(List<TeacherProfile> teachers) {
+        if (partnerCardGrid == null) return;
+        partnerCardGrid.getChildren().clear();
+
+        String partner = currentPartner();
+        for (TeacherProfile teacher : teachers) {
+            String[] eval = STORE.partnerEvaluation(partner, teacher.getId());
+            String evalBadge = (eval != null && eval.length > 0 && eval[0] != null) ? eval[0] : "";
+            VBox card = ProfileCardBuilder.buildPartnerTeacherCard(
+                    teacher,
+                    evalBadge,
+                    () -> {
+                        PartnerProfileController.setSelectedTeacherId(teacher.getId());
+                        navigate("PartnerProfile.fxml");
+                    },
+                    () -> openDoc(teacher, "CV"),
+                    () -> openDoc(teacher, "Intro video"),
+                    () -> {
+                        PartnerInterviewController.setPreselectedTeacherId(teacher.getId());
+                        navigate("PartnerInterview.fxml");
+                    }
+            );
+            partnerCardGrid.getChildren().add(card);
         }
-        if (countNote != null) {
-            countNote.setText("Showing " + shown + " shared teacher profile(s) available to this partner.");
+
+        if (teachers.isEmpty()) {
+            Label empty = new Label("No shared teacher profiles match the selected filters.");
+            empty.getStyleClass().add("muted");
+            VBox box = new VBox(empty);
+            box.getStyleClass().add("table-row");
+            partnerCardGrid.getChildren().add(box);
         }
+    }
+
+    private void openDoc(TeacherProfile teacher, String category) {
+        TeacherDocument doc = ProfileCardBuilder.findDocumentByCategory(STORE, teacher.getId(), category);
+        if (doc == null || !STORE.openDocument(currentPartner(), doc)) {
+            LoginController.showAlert(Alert.AlertType.INFORMATION, "Document Preview",
+                    "No " + category + " file is currently available for " + teacher.getName() + ".");
+        }
+    }
+
+    private String selectedNationality() {
+        if (nationalityFilter == null) return "All";
+        if (nationalityFilter.isEditable() && nationalityFilter.getEditor() != null) {
+            String txt = nationalityFilter.getEditor().getText();
+            if (txt != null && !txt.isBlank()) return txt.trim();
+        }
+        Object v = nationalityFilter.getValue();
+        return v == null ? "All" : String.valueOf(v).trim();
+    }
+
+    private String selected(ComboBox<String> combo) {
+        return combo == null || combo.getValue() == null ? "All" : combo.getValue().trim();
+    }
+
+    private boolean isAll(String value) {
+        return value == null || value.isBlank() || value.equalsIgnoreCase("All");
     }
 
     private void navigate(String fxml) {
@@ -154,34 +258,6 @@ public class PartnerDashboardController {
         if (nav_Login != null && !LoginController.navigateTo(nav_Login, "Login.fxml")) {
             showError("Navigation failed", "Could not load Login.fxml.");
         }
-    }
-
-    private boolean containsTeacherName(VBox card) {
-        return !FxNodes.findAllByStyleClass(card, "section-title", Label.class).isEmpty()
-                && findButton(card, "View profile & video") != null;
-    }
-
-    private void setLabelContainingPrefix(VBox card, String prefix, String value) {
-        for (Label l : FxNodes.findAll(card, Label.class)) {
-            if (l.getText() != null && l.getText().startsWith(prefix)) {
-                l.setText(value);
-                return;
-            }
-        }
-    }
-
-    private void setLabelByStyle(VBox card, String style, String value) {
-        for (Label l : FxNodes.findAllByStyleClass(card, style, Label.class)) {
-            l.setText(value.isBlank() ? "Not provided" : value);
-            return;
-        }
-    }
-
-    private Button findButton(VBox card, String text) {
-        for (Button b : FxNodes.findAll(card, Button.class)) {
-            if (text.equals(b.getText())) return b;
-        }
-        return null;
     }
 
     private static String safe(String value) {

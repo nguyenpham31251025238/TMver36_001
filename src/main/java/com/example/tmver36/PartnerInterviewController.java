@@ -11,17 +11,17 @@ import javafx.scene.Parent;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
 
-import java.awt.Desktop;
-import java.net.URI;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -74,7 +74,7 @@ public class PartnerInterviewController {
             teacherSelector.setConverter(new StringConverter<>() {
                 @Override
                 public String toString(TeacherProfile teacher) {
-                    return teacher == null ? "" : teacher.getName();
+                    return teacher == null ? "" : teacher.getName() + " (" + teacher.getNationality() + " · " + teacher.getExpectedSalary() + ")";
                 }
 
                 @Override
@@ -137,7 +137,7 @@ public class PartnerInterviewController {
         }
         refreshAvailableSlots();
         refreshView();
-        showInfo("Request sent", "Interview request saved for " + selectedTeacher.getName() + " at " + slot + ".");
+        showInfo("Request sent", "Interview request saved for " + selectedTeacher.getName() + " at " + slot + ". Meeting link generated and ready!");
     }
 
     private void handleSendResult() {
@@ -209,26 +209,81 @@ public class PartnerInterviewController {
         while (requestsTable.getChildren().size() > 1) {
             requestsTable.getChildren().remove(1);
         }
+        boolean firstRow = true;
         for (Interview interview : interviews) {
             HBox row = new HBox(0);
             row.setAlignment(Pos.CENTER_LEFT);
             row.getStyleClass().add("table-row");
-            row.getChildren().add(cell(safe(interview.getTeacherName()), 210));
-            row.getChildren().add(cell(formatDateTime(safe(interview.getDateTime())), 260));
-            row.getChildren().add(cell(safe(interview.getStatus()), 250));
+            row.getChildren().add(cell(safe(interview.getTeacherName()), 200));
+            row.getChildren().add(cell(formatDateTime(safe(interview.getDateTime())), 220));
+
+            Label statusBadge = new Label(safe(interview.getStatus()));
+            String badgeClass = "CONFIRMED".equalsIgnoreCase(interview.getStatus()) ? "badge-green" : "badge-amber";
+            statusBadge.getStyleClass().addAll("badge", badgeClass);
+            VBox statusCol = new VBox(statusBadge);
+            statusCol.setAlignment(Pos.CENTER_LEFT);
+            statusCol.setMinWidth(170);
+            statusCol.setPrefWidth(190);
+            row.getChildren().add(statusCol);
+
             String meetUrl = interview.getMeetingUrl() != null && !interview.getMeetingUrl().isBlank()
                     ? interview.getMeetingUrl()
                     : PortalStore.generateMeetingLink(interview);
-            row.getChildren().add(cell(meetUrl, 250));
+            final String resolvedMeetUrl = meetUrl;
+
+            Hyperlink meetLink = new Hyperlink(resolvedMeetUrl);
+            meetLink.setOnAction(e -> joinAndCopyMeetUrl(resolvedMeetUrl));
+
+            Button joinBtn = (firstRow && openPartnerMeetButton != null)
+                    ? openPartnerMeetButton
+                    : new Button("Join Meet");
+            firstRow = false;
+            joinBtn.setText("Join Meet");
+            joinBtn.getStyleClass().setAll("button-sm", "primary");
+            joinBtn.setOnAction(e -> joinAndCopyMeetUrl(resolvedMeetUrl));
+
+            Button copyBtn = new Button("Copy Link");
+            copyBtn.getStyleClass().setAll("button-sm", "secondary");
+            copyBtn.setOnAction(e -> {
+                copyToClipboard(resolvedMeetUrl);
+                showInfo("Meeting Link Copied", "Copied shared meeting link to clipboard:\n" + resolvedMeetUrl);
+            });
+
+            HBox btnBar = new HBox(8, joinBtn, copyBtn);
+            btnBar.setAlignment(Pos.CENTER_LEFT);
+
+            VBox linkCol = new VBox(4, meetLink, btnBar);
+            linkCol.setAlignment(Pos.CENTER_LEFT);
+            linkCol.setMinWidth(280);
+            linkCol.setPrefWidth(340);
+            HBox.setHgrow(linkCol, Priority.ALWAYS);
+
+            row.getChildren().add(linkCol);
             requestsTable.getChildren().add(row);
+        }
+    }
+
+    private void joinAndCopyMeetUrl(String meetUrl) {
+        copyToClipboard(meetUrl);
+        STORE.log(currentPartner(), "Joined interview room " + meetUrl);
+        if (!PortalStore.openInBrowser(meetUrl)) {
+            showInfo("Meeting Room Link", "Meeting link copied to clipboard:\n" + meetUrl);
+        }
+    }
+
+    private void copyToClipboard(String text) {
+        try {
+            ClipboardContent content = new ClipboardContent();
+            content.putString(text);
+            Clipboard.getSystemClipboard().setContent(content);
+        } catch (Exception ignored) {
         }
     }
 
     private VBox cell(String text, double width) {
         VBox box = new VBox();
-        box.setMinWidth(width);
+        box.setMinWidth(width - 20);
         box.setPrefWidth(width);
-        box.setMaxWidth(width);
         box.setAlignment(Pos.CENTER_LEFT);
         box.setStyle("-fx-padding: 12 8 12 8;");
         Label label = new Label(text == null || text.isBlank() ? "—" : text);
@@ -256,15 +311,7 @@ public class PartnerInterviewController {
             if (meetUrl.isBlank()) {
                 meetUrl = PortalStore.generateMeetingLink(interview);
             }
-            try {
-                ClipboardContent content = new ClipboardContent();
-                content.putString(meetUrl);
-                Clipboard.getSystemClipboard().setContent(content);
-            } catch (Exception ignored) {
-            }
-            if (!PortalStore.openInBrowser(meetUrl)) {
-                showError("Could not open meeting room", "Please open this URL in your browser:\n" + meetUrl);
-            }
+            joinAndCopyMeetUrl(meetUrl);
         } catch (Exception ex) {
             showError("Could not open Meet", ex.getMessage());
         }

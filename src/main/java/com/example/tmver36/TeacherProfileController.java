@@ -7,15 +7,24 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuButton;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.StackPane;
+import javafx.stage.FileChooser;
+import javafx.stage.Window;
 
+import java.io.File;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
 /** JavaFX controller for editing the current teacher profile (TeacherProfile.fxml). */
 public class TeacherProfileController {
@@ -28,11 +37,27 @@ public class TeacherProfileController {
     @FXML private Button nav_TeacherHistory;
     @FXML private Button nav_Login;
 
+    @FXML private Label sidebarAvatarInitials;
+    @FXML private Label sidebarTeacherName;
+    @FXML private Label topAvatarInitials;
+    @FXML private StackPane avatarContainer;
+    @FXML private Label headerNameLabel;
+    @FXML private Label headerSubtitleLabel;
+    @FXML private Button uploadAvatarButton;
+    @FXML private Label statusBadgeLabel;
+    @FXML private Label profileNoteLabel;
+    @FXML private Label staffFeedbackBanner;
+
     @FXML private TextField fullNameField;
     @FXML private TextField emailField;
     @FXML private ComboBox<String> nationalityCombo;
     @FXML private TextField phoneField;
-    @FXML private TextField experienceCombo;
+    @FXML private ComboBox<String> degreeCombo;
+    @FXML private ComboBox<String> majorCombo;
+    @FXML private ComboBox<String> experienceTierCombo;
+    @FXML private TextField experienceCombo; // legacy compatible field
+    @FXML private MenuButton certificatesMenuButton;
+    @FXML private ComboBox<String> expectedSalaryCombo;
     @FXML private ComboBox<String> aboutArea;
     @FXML private TextField locationCombo;
     @FXML private TextField dateSelect;
@@ -41,13 +66,80 @@ public class TeacherProfileController {
     @FXML private Button submitProfileButton;
 
     private TeacherProfile profile;
+    private final Set<String> selectedCertificates = new LinkedHashSet<>();
+    private final List<CheckMenuItem> certItems = new ArrayList<>();
+    private boolean updatingCountryFilter;
 
     @FXML
     private void initialize() {
+        configureCatalogControls();
         wireNavigation();
         loadProfileIntoForm();
+        if (uploadAvatarButton != null) uploadAvatarButton.setOnAction(e -> chooseAndUploadAvatar());
         if (saveDraftButton != null) saveDraftButton.setOnAction(e -> saveDraft(true));
         if (submitProfileButton != null) submitProfileButton.setOnAction(e -> submitForReview());
+    }
+
+    private void configureCatalogControls() {
+        if (nationalityCombo != null) {
+            nationalityCombo.getItems().setAll(CatalogData.WORLD_COUNTRIES_AZ);
+            nationalityCombo.setEditable(true);
+            if (nationalityCombo.getEditor() != null) {
+                nationalityCombo.getEditor().textProperty().addListener((obs, oldText, newText) -> {
+                    if (updatingCountryFilter) return;
+                    updatingCountryFilter = true;
+                    try {
+                        List<String> filtered = CatalogData.filterCountries(newText, false);
+                        nationalityCombo.getItems().setAll(filtered);
+                        nationalityCombo.getEditor().setText(newText);
+                    } finally {
+                        updatingCountryFilter = false;
+                    }
+                });
+            }
+        }
+        if (degreeCombo != null) {
+            degreeCombo.getItems().setAll(CatalogData.DEGREE_OPTIONS);
+        }
+        if (majorCombo != null) {
+            majorCombo.getItems().setAll(CatalogData.MAJOR_OPTIONS);
+            majorCombo.setEditable(true);
+        }
+        if (experienceTierCombo != null) {
+            experienceTierCombo.getItems().setAll(CatalogData.EXPERIENCE_OPTIONS);
+            experienceTierCombo.setOnAction(e -> {
+                if (experienceCombo != null && experienceTierCombo.getValue() != null) {
+                    experienceCombo.setText(experienceTierCombo.getValue());
+                }
+            });
+        }
+        if (expectedSalaryCombo != null) {
+            expectedSalaryCombo.getItems().setAll(CatalogData.EXPECTED_SALARY_OPTIONS);
+            expectedSalaryCombo.setEditable(true);
+        }
+        if (certificatesMenuButton != null) {
+            certificatesMenuButton.getItems().clear();
+            certItems.clear();
+            for (String cert : CatalogData.CERTIFICATE_OPTIONS) {
+                CheckMenuItem item = new CheckMenuItem(cert);
+                item.selectedProperty().addListener((obs, oldV, isSelected) -> {
+                    if (isSelected) selectedCertificates.add(cert);
+                    else selectedCertificates.remove(cert);
+                    updateCertificateButtonText();
+                });
+                certItems.add(item);
+                certificatesMenuButton.getItems().add(item);
+            }
+        }
+    }
+
+    private void updateCertificateButtonText() {
+        if (certificatesMenuButton == null) return;
+        if (selectedCertificates.isEmpty()) {
+            certificatesMenuButton.setText("Select certificates");
+        } else {
+            certificatesMenuButton.setText(CatalogData.joinCertificates(selectedCertificates));
+        }
     }
 
     private void wireNavigation() {
@@ -72,22 +164,60 @@ public class TeacherProfileController {
         }
         if (fullNameField != null) fullNameField.setText(safe(profile.getName()));
         if (emailField != null) emailField.setText(safe(profile.getEmail()));
-        if (nationalityCombo != null) selectComboValue(nationalityCombo, profile.getNationality());
+        if (nationalityCombo != null) {
+            updatingCountryFilter = true;
+            try {
+                nationalityCombo.getItems().setAll(CatalogData.WORLD_COUNTRIES_AZ);
+                selectComboValue(nationalityCombo, nonBlank(profile.getNationality(), "United Kingdom"));
+                if (nationalityCombo.getEditor() != null) {
+                    nationalityCombo.getEditor().setText(nonBlank(profile.getNationality(), "United Kingdom"));
+                }
+            } finally {
+                updatingCountryFilter = false;
+            }
+        }
         if (phoneField != null) phoneField.setText(safe(profile.getPhone()));
-        if (experienceCombo != null) experienceCombo.setText(safe(profile.getExperience()));
-        if (aboutArea != null) selectComboValue(aboutArea, profile.getTargetAgeGroup());
+        if (degreeCombo != null) selectComboValue(degreeCombo, nonBlank(profile.getDegree(), "Bachelor's Degree"));
+        if (majorCombo != null) selectComboValue(majorCombo, nonBlank(profile.getMajor(), nonBlank(profile.getSubject(), "English Education")));
+
+        String normalizedExp = CatalogData.normalizeExperienceBand(profile.getExperience());
+        if (experienceTierCombo != null) selectComboValue(experienceTierCombo, normalizedExp);
+        if (experienceCombo != null) experienceCombo.setText(normalizedExp);
+
+        selectedCertificates.clear();
+        selectedCertificates.addAll(CatalogData.parseCertificates(profile.getCertificates()));
+        for (CheckMenuItem item : certItems) {
+            item.setSelected(selectedCertificates.contains(item.getText()));
+        }
+        updateCertificateButtonText();
+
+        if (expectedSalaryCombo != null) {
+            selectComboValue(expectedSalaryCombo, nonBlank(profile.getExpectedSalary(), "$1,500 - $2,000"));
+        }
+        if (aboutArea != null) selectComboValue(aboutArea, nonBlank(profile.getTargetAgeGroup(), "Elementary School"));
         if (locationCombo != null) locationCombo.setText(safe(profile.getLocation()));
         if (dateSelect != null) dateSelect.setText(safe(profile.getAvailableStartDate()));
         if (bioArea != null) bioArea.setText(safe(profile.getBio()));
 
-        Parent root = sourceRoot();
-        if (root != null) {
-            setLabelByText(root, "Emily Martin", safe(profile.getName()));
-            setLabelByText(root, "English Teacher · United Kingdom",
-                    safe(profile.getSubject()) + " Teacher · " + nonBlank(profile.getNationality(), "International"));
-            setLabelByText(root, "Pending review", nonBlank(profile.getStatus(), "DRAFT"));
-            setLabelByText(root, "Profile submitted on 14/10/2026. Update information when Matching requests.",
-                    "Profile status: " + nonBlank(profile.getStatus(), "DRAFT") + ". Update your information and save draft or submit for review.");
+        updateHeader();
+    }
+
+    private void chooseAndUploadAvatar() {
+        if (profile == null) profile = resolveCurrentProfile();
+        if (profile == null) return;
+        Window window = uploadAvatarButton == null || uploadAvatarButton.getScene() == null ? null : uploadAvatarButton.getScene().getWindow();
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Upload Profile Avatar");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg"));
+        File file = chooser.showOpenDialog(window);
+        if (file == null) return;
+        if (STORE.updateTeacherAvatar(currentActor(), profile.getId(), file.toPath()) != null) {
+            profile = STORE.teacher(profile.getId());
+            updateHeader();
+            setFeedback("Avatar updated for " + safe(profile.getName()) + ".");
+            LoginController.showAlert(Alert.AlertType.INFORMATION, "Avatar Updated", "Your profile photo has been updated and synced.");
+        } else {
+            LoginController.showAlert(Alert.AlertType.ERROR, "Upload Failed", "Could not update avatar image.");
         }
     }
 
@@ -101,10 +231,23 @@ public class TeacherProfileController {
 
         profile.setName(value(fullNameField));
         profile.setEmail(value(emailField));
-        profile.setNationality(value(nationalityCombo));
+        profile.setNationality(comboOrEditorValue(nationalityCombo, "Other"));
         profile.setPhone(value(phoneField));
-        profile.setExperience(value(experienceCombo));
-        profile.setTargetAgeGroup(value(aboutArea));
+        profile.setDegree(comboOrEditorValue(degreeCombo, "Bachelor's Degree"));
+        String majorVal = comboOrEditorValue(majorCombo, "English Education");
+        profile.setMajor(majorVal);
+        profile.setSubject(majorVal);
+
+        String expVal = experienceTierCombo != null && experienceTierCombo.getValue() != null
+                ? experienceTierCombo.getValue()
+                : value(experienceCombo);
+        profile.setExperience(CatalogData.normalizeExperienceBand(expVal));
+
+        if (!selectedCertificates.isEmpty()) {
+            profile.setCertificates(CatalogData.joinCertificates(selectedCertificates));
+        }
+        profile.setExpectedSalary(comboOrEditorValue(expectedSalaryCombo, "$1,500 - $2,000"));
+        profile.setTargetAgeGroup(comboOrEditorValue(aboutArea, "Elementary School"));
         profile.setLocation(value(locationCombo));
         profile.setAvailableStartDate(value(dateSelect));
         if (bioArea != null && bioArea.getText() != null) {
@@ -112,6 +255,7 @@ public class TeacherProfileController {
         }
 
         STORE.saveTeacherProfile(currentActor(), profile);
+        profile = STORE.teacher(profile.getId());
         updateHeader();
         setFeedback("Draft saved.");
         if (notify) {
@@ -125,9 +269,10 @@ public class TeacherProfileController {
         if (profile == null) return;
         STORE.status(currentActor(), profile.getId(), "PENDING");
         STORE.log(currentActor(), "Submitted teacher profile #" + profile.getId() + " for review");
+        profile = STORE.teacher(profile.getId());
         updateHeader();
-        setFeedback("Profile submitted for review.");
-        LoginController.showAlert(Alert.AlertType.INFORMATION, "Submitted for Review", "Your profile status is now PENDING.");
+        setFeedback("Profile submitted for review (qCV).");
+        LoginController.showAlert(Alert.AlertType.INFORMATION, "Submitted for Review", "Your profile status is now qCV (Pending Review).");
     }
 
     private boolean validateRequiredFields() {
@@ -157,12 +302,35 @@ public class TeacherProfileController {
     }
 
     private void updateHeader() {
-        Parent root = sourceRoot();
-        if (root != null && profile != null) {
-            for (Label label : FxNodes.findAllByStyleClass(root, "sidebar-name", Label.class)) {
-                label.setText(profile.getName());
+        if (profile == null) return;
+        String initials = ProfileCardBuilder.initialsOf(profile.getName());
+        if (sidebarAvatarInitials != null) sidebarAvatarInitials.setText(initials);
+        if (topAvatarInitials != null) topAvatarInitials.setText(initials);
+        if (sidebarTeacherName != null) sidebarTeacherName.setText(safe(profile.getName()));
+        if (headerNameLabel != null) headerNameLabel.setText(safe(profile.getName()));
+        if (headerSubtitleLabel != null) {
+            String deg = nonBlank(profile.getDegree(), "Bachelor's Degree");
+            String maj = nonBlank(profile.getMajor(), nonBlank(profile.getSubject(), "English Education"));
+            String sal = nonBlank(profile.getExpectedSalary(), "$1,500 - $2,000");
+            headerSubtitleLabel.setText(deg + " in " + maj + " · " + nonBlank(profile.getNationality(), "International") + " · " + sal + "/mo");
+        }
+        if (avatarContainer != null) {
+            avatarContainer.getChildren().setAll(ProfileCardBuilder.createAvatarNode(profile, 60));
+        }
+        if (statusBadgeLabel != null) {
+            statusBadgeLabel.setText(CatalogData.formatStatusBadge(profile.getStatus()));
+            statusBadgeLabel.getStyleClass().setAll("badge", CatalogData.badgeStyleForStatus(profile.getStatus()));
+        }
+        if (staffFeedbackBanner != null) {
+            String fb = safe(profile.getStaffFeedback());
+            if (!fb.isBlank()) {
+                staffFeedbackBanner.setText("Matching Staff Feedback: " + fb);
+                staffFeedbackBanner.setManaged(true);
+                staffFeedbackBanner.setVisible(true);
+            } else {
+                staffFeedbackBanner.setManaged(false);
+                staffFeedbackBanner.setVisible(false);
             }
-            setLabelByText(root, "Pending review", nonBlank(profile.getStatus(), "DRAFT"));
         }
     }
 
@@ -172,27 +340,32 @@ public class TeacherProfileController {
             combo.getItems().add(value);
         }
         combo.setValue(value);
+        if (combo.isEditable() && combo.getEditor() != null) {
+            combo.getEditor().setText(value);
+        }
     }
 
-    private String value(ComboBox<String> combo) {
-        return combo == null || combo.getValue() == null ? "" : combo.getValue().trim();
+    private String comboOrEditorValue(ComboBox<String> combo, String fallback) {
+        if (combo == null) return fallback;
+        if (combo.isEditable() && combo.getEditor() != null) {
+            String txt = combo.getEditor().getText();
+            if (txt != null && !txt.isBlank()) {
+                return txt.trim();
+            }
+        }
+        String val = combo.getValue();
+        return val == null || val.isBlank() ? fallback : val.trim();
     }
 
     private String value(TextField field) {
         return field == null || field.getText() == null ? "" : field.getText().trim();
     }
 
-    private void setLabelByText(Parent root, String oldText, String newText) {
-        if (root == null || newText == null || newText.isBlank()) return;
-        for (Label label : FxNodes.findAll(root, Label.class)) {
-            if (oldText.equals(label.getText())) {
-                label.setText(newText);
-                return;
-            }
-        }
-    }
-
     private void setFeedback(String message) {
+        if (profileNoteLabel != null) {
+            profileNoteLabel.setText(message);
+            return;
+        }
         Parent root = sourceRoot();
         if (root != null) {
             Label note = FxNodes.findFirstByStyleClass(root, "note", Label.class);

@@ -13,32 +13,34 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
-<HBox prefHeight="900" prefWidth="1360" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.LoginController">
-<VBox minWidth="610" prefWidth="610" spacing="32" style="-fx-background-image: url('@photo/bg_login.png'); -fx-background-size: cover; -fx-background-position: center;" styleClass="login-left">    <HBox alignment="CENTER_LEFT" spacing="12">
+<HBox prefHeight="860" prefWidth="1280" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.LoginController">
+  <VBox minWidth="440" prefWidth="520" spacing="28" style="-fx-background-image: url('@photo/bg_login.png'); -fx-background-size: cover; -fx-background-position: center;" styleClass="login-left">
+    <HBox alignment="CENTER_LEFT" spacing="12">
       <Label styleClass="brand-mark" text="TM" />
       <Label styleClass="brand" text="TeacherMatch" />
     </HBox>
     <Region VBox.vgrow="ALWAYS" />
-    <Label styleClass="login-hero" text="Right teacher.                                             Right opportunity." wrapText="true">
-         <font>
-            <Font name="Candara Bold" size="12.0" />
-         </font></Label>
-    <Label styleClass="login-sub" text="Connect profiles, partners, and interview schedules in one workspace." wrapText="true" />
-    <VBox spacing="18">
-      <Label styleClass="login-feature" text="01     Diverse talent pool" />
-      <Label styleClass="login-feature" text="02     Seamless end-to-end workflow" />
-      <Label styleClass="login-feature" />
+    <Label styleClass="login-hero" text="Right teacher. Right opportunity." wrapText="true">
+      <font>
+        <Font name="Candara Bold" size="12.0" />
+      </font>
+    </Label>
+    <Label styleClass="login-sub" text="Connect verified teacher profiles, partner academies, and live interview rooms in one synchronized workspace." wrapText="true" />
+    <VBox spacing="16">
+      <Label styleClass="login-feature" text="01     Verified global ESL talent pool" />
+      <Label styleClass="login-feature" text="02     Seamless qCV &amp; qEP review workflow" />
+      <Label styleClass="login-feature" text="03     Multi-device cloud sync &amp; live meeting links" />
     </VBox>
     <Region VBox.vgrow="ALWAYS" />
     <Label styleClass="brand-sub" text="GLOBAL TEACHER RECRUITMENT / VIETNAM" />
   </VBox>
   <VBox alignment="CENTER" spacing="12" styleClass="login-right" HBox.hgrow="ALWAYS">
-    <VBox maxWidth="420" spacing="22">
+    <VBox maxWidth="420" spacing="20">
       <Label styleClass="badge,badge-green" text="WELCOME BACK" />
       <Label styleClass="page-title" text="Login" />
-      <Label styleClass="muted" text="Please select your designated role to access the appropriate workspace." />
+      <Label styleClass="muted" text="Please select your designated role to access the appropriate workspace." wrapText="true" />
       <VBox spacing="7" HBox.hgrow="ALWAYS">
-        <Label styleClass="field-label" text="Preview role" />
+        <Label styleClass="field-label" text="Workspace role" />
         <ComboBox fx:id="demoRole" maxWidth="Infinity" prefWidth="400">
           <items>
             <FXCollections fx:factory="observableArrayList">
@@ -61,7 +63,10 @@
         <Label styleClass="field-label" text="Password" />
         <PasswordField fx:id="passwordField" promptText="Enter Password" />
       </VBox>
-      <CheckBox text="Remember me" />
+      <HBox alignment="CENTER_LEFT" spacing="10">
+        <CheckBox fx:id="rememberMeCheck" text="Remember me (keep signed-in session token)" />
+      </HBox>
+      <Label fx:id="sessionHintLabel" managed="false" styleClass="muted" text="" visible="false" wrapText="true" />
       <Button fx:id="loginButton" maxWidth="Infinity" onAction="#handleLoginAction" styleClass="primary" text="Enter interface" />
     </VBox>
   </VBox>

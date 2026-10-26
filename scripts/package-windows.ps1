@@ -9,13 +9,11 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectRoot
 
-if (-not $env:JAVA_HOME -or -not (Test-Path (Join-Path $env:JAVA_HOME "bin\jpackage.exe"))) {
-    $candidateJdk = "C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot"
-    if (Test-Path (Join-Path $candidateJdk "bin\jpackage.exe")) {
-        $env:JAVA_HOME = $candidateJdk
-    } else {
-        throw "JAVA_HOME with JDK 21+ (containing bin\jpackage.exe) is required."
-    }
+$candidateJdk = "C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot"
+if (Test-Path (Join-Path $candidateJdk "bin\jpackage.exe")) {
+    $env:JAVA_HOME = $candidateJdk
+} elseif (-not $env:JAVA_HOME -or -not (Test-Path (Join-Path $env:JAVA_HOME "bin\jpackage.exe"))) {
+    throw "JAVA_HOME with JDK 21+ (containing bin\jpackage.exe) is required."
 }
 $env:PATH = "$($env:JAVA_HOME)\bin;$($env:PATH)"
 
@@ -81,7 +79,7 @@ Write-Host "Running jpackage for self-contained app-image..."
     --input $inputDir `
     --main-jar "TMver36-1.0-SNAPSHOT.jar" `
     --main-class "com.example.tmver36.Launcher" `
-    --add-modules "java.base,java.desktop,java.xml,java.logging,java.scripting,java.naming,java.prefs,java.datatransfer,jdk.unsupported"
+    --add-modules "java.base,java.desktop,java.xml,java.logging,java.scripting,java.naming,java.prefs,java.datatransfer,java.net.http,jdk.crypto.ec,jdk.unsupported"
 if ($LASTEXITCODE -ne 0) {
     throw "jpackage failed for app-image with exit code $LASTEXITCODE"
 }

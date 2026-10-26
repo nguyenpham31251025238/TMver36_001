@@ -1,23 +1,23 @@
 package com.example.tmver36.service;
 
+import com.example.tmver36.CatalogData;
 import com.example.tmver36.model.AppUser;
 import com.example.tmver36.model.AvailabilitySlot;
 import com.example.tmver36.model.Interview;
 import com.example.tmver36.model.TeacherDocument;
 import com.example.tmver36.model.TeacherProfile;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
-import java.util.Locale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -26,9 +26,11 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -37,6 +39,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class PortalStore {
 
     private static final String STATE_FILE_NAME = "portal-store.properties";
+    private static final String SCHEMA_VERSION = "2.0";
     private static final DateTimeFormatter UPDATED_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final Map<String, AppUser> users = new LinkedHashMap<>();
@@ -47,7 +50,6 @@ public class PortalStore {
     private final List<AvailabilitySlot> availabilitySlots = new ArrayList<>();
     private final List<String[]> logs = new ArrayList<>();
 
-    // Stores access grants in the form username:teacherId.
     private final Set<String> granted = new LinkedHashSet<>();
     private final Map<String, String[]> partnerEvaluations = new LinkedHashMap<>();
 
@@ -58,23 +60,71 @@ public class PortalStore {
 
     private Path customDataDir;
     private boolean suppressSave;
+    private CloudSyncService cloudSync;
 
     public PortalStore() {
-        this(null);
+        this(null, new CloudSyncService());
     }
 
     public PortalStore(Path customDataDir) {
+        this(customDataDir, new CloudSyncService(
+                System.getProperty("tm.supabase.url"),
+                System.getProperty("tm.supabase.key"),
+                System.getProperty("tm.supabase.stateId"),
+                customDataDir == null ? Boolean.parseBoolean(System.getProperty("tm.cloud.sync", "true"))
+                        : Boolean.parseBoolean(System.getProperty("tm.cloud.sync", "false"))
+        ));
+    }
+
+    public PortalStore(Path customDataDir, CloudSyncService cloudSync) {
         this.customDataDir = customDataDir;
+        this.cloudSync = cloudSync != null ? cloudSync : new CloudSyncService();
+        initializeStore();
+    }
+
+    private void initializeStore() {
+        if (cloudSync != null && cloudSync.isEnabled()) {
+            Properties remoteProps = cloudSync.pullProperties();
+            if (remoteProps != null && loadFromProperties(remoteProps)) {
+                saveLocalOnly();
+                return;
+            }
+        }
         Path stateFile = getStateFilePath();
         if (Files.isRegularFile(stateFile)) {
-            if (!loadFromDisk(stateFile)) {
-                seedDefaults();
-                saveState();
+            if (loadFromDisk(stateFile)) {
+                return;
             }
-        } else {
-            seedDefaults();
-            saveState();
         }
+        seedDefaults();
+        saveState();
+    }
+
+    public CloudSyncService getCloudSync() {
+        return cloudSync;
+    }
+
+    public void setCloudSync(CloudSyncService cloudSync) {
+        this.cloudSync = cloudSync;
+    }
+
+    public synchronized boolean syncFromCloud() {
+        if (cloudSync == null || !cloudSync.isEnabled()) {
+            return false;
+        }
+        Properties remoteProps = cloudSync.pullProperties();
+        if (remoteProps != null && loadFromProperties(remoteProps)) {
+            saveLocalOnly();
+            return true;
+        }
+        return false;
+    }
+
+    public synchronized boolean pushToCloud() {
+        if (cloudSync == null || !cloudSync.isEnabled()) {
+            return false;
+        }
+        return cloudSync.pushProperties(toProperties());
     }
 
     public Path getDataDir() {
@@ -98,6 +148,13 @@ public class PortalStore {
     }
 
     public synchronized boolean reloadFromDisk() {
+        if (cloudSync != null && cloudSync.isEnabled()) {
+            Properties remote = cloudSync.pullProperties();
+            if (remote != null && loadFromProperties(remote)) {
+                saveLocalOnly();
+                return true;
+            }
+        }
         return loadFromDisk(getStateFilePath());
     }
 
@@ -117,6 +174,31 @@ public class PortalStore {
         availabilityIds.set(0);
     }
 
+    private Path materializeBundledResource(String resourcePath, long teacherId, String fileName) {
+        try {
+            Path targetDir = getDataDir().resolve("documents").resolve(Long.toString(teacherId));
+            Files.createDirectories(targetDir);
+            Path targetFile = targetDir.resolve(fileName);
+            if (!Files.isRegularFile(targetFile)) {
+                try (InputStream in = PortalStore.class.getResourceAsStream(resourcePath)) {
+                    if (in != null) {
+                        Files.copy(in, targetFile, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                }
+            }
+            if (Files.isRegularFile(targetFile)) {
+                return targetFile.toAbsolutePath();
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    private String seedDocLocation(long teacherId, String sampleFileName) {
+        Path p = materializeBundledResource("/com/example/tmver36/samples/" + sampleFileName, teacherId, sampleFileName);
+        return p != null ? p.toString() : sampleFileName;
+    }
+
     private void seedDefaults() {
         suppressSave = true;
         try {
@@ -126,72 +208,128 @@ public class PortalStore {
             users.put("staff", new AppUser("staff", "staff123", "STAFF", "Matching Staff"));
             users.put("partner", new AppUser("partner", "partner123", "PARTNER", "Bright English Center"));
             users.put("teacher", new AppUser("teacher", "teacher123", "TEACHER", "Emily Martin"));
+            users.put("daniel", new AppUser("daniel", "daniel123", "TEACHER", "Daniel Walker"));
+            users.put("sarah", new AppUser("sarah", "sarah123", "TEACHER", "Sarah Thompson"));
+
+            String emilyCv = seedDocLocation(1L, "Emily_Martin_CV.pdf");
+            String emilyCert = seedDocLocation(1L, "Emily_Martin_CELTA_TESOL.pdf");
+            String emilyIntro = seedDocLocation(1L, "Emily_Martin_Intro_Video.html");
+            String emilyDemo = seedDocLocation(1L, "Emily_Martin_Demo_Lesson.html");
 
             TeacherProfile emily = new TeacherProfile(
-                    1,
+                    1L,
                     "Emily Martin",
-                    "emily.martin@example.com",
-                    "American",
+                    "United Kingdom",
                     "Ho Chi Minh City",
-                    "5 years",
-                    "TEFL, Bachelor's degree",
+                    "3–5 years",
+                    "CELTA, TESOL",
+                    "English Education",
+                    "Bachelor's Degree",
+                    "English Education",
+                    "$1,500 - $2,000",
                     "READY",
-                    "https://example.com/emily-demo",
-                    "https://example.com/emily-cv"
+                    "01/12/2026",
+                    "emily.martin@example.com",
+                    "+84 912 345 678",
+                    "Experienced primary English teacher with CELTA and TESOL certifications. Passionate about interactive phonics, communicative ESL, and student-centered classroom activities.",
+                    "photo/emily_avatar.png",
+                    emilyCv,
+                    emilyCert,
+                    emilyIntro,
+                    emilyDemo,
+                    "Verified profile and teaching demo. Ready for partner introduction.",
+                    "1,1,1,1,1"
             );
-            emily.setSubject("English (ESL)");
             emily.setTargetAgeGroup("Primary (6-11)");
-            emily.setAvailableStartDate("12/2026");
-            emily.setPhone("+84 912 345 678");
-            emily.setBio("Experienced primary English teacher with a CELTA certificate. I enjoy building engaging lessons through games and collaborative activities.");
+            emily.setAvailableStartDate("01/12/2026");
             teachers.add(emily);
             teacherProfilesByUser.put("teacher", 1L);
 
+            String danielCv = seedDocLocation(2L, "Daniel_Walker_CV.pdf");
+            String danielCert = seedDocLocation(2L, "Daniel_Walker_TESOL.pdf");
+            String danielIntro = seedDocLocation(2L, "Daniel_Walker_Intro_Video.html");
+            String danielDemo = seedDocLocation(2L, "Daniel_Walker_Demo_Lesson.html");
+
             TeacherProfile daniel = new TeacherProfile(
-                    2,
+                    2L,
                     "Daniel Walker",
-                    "daniel.walker@example.com",
-                    "British",
+                    "Canada",
                     "Hanoi",
-                    "3 years",
-                    "CELTA",
+                    "3–5 years",
+                    "TESOL, IELTS",
+                    "TESOL & Applied Linguistics",
+                    "Master's Degree",
+                    "TESOL & Applied Linguistics",
+                    "$2,000 - $2,500",
                     "READY",
-                    "https://example.com/daniel-demo",
-                    "https://example.com/daniel-cv"
+                    "15/01/2027",
+                    "daniel.walker@example.com",
+                    "+84 934 567 890",
+                    "Academic English and IELTS specialist with a Master's degree in TESOL & Applied Linguistics. Proven track record helping secondary and high-school learners reach IELTS 7.5+.",
+                    "photo/daniel_avatar.png",
+                    danielCv,
+                    danielCert,
+                    danielIntro,
+                    danielDemo,
+                    "All academic credentials and IELTS teaching demo verified.",
+                    "1,1,1,1,1"
             );
-            daniel.setSubject("IELTS / Academic English");
             daniel.setTargetAgeGroup("Secondary (12-17)");
-            daniel.setAvailableStartDate("01/2027");
+            daniel.setAvailableStartDate("15/01/2027");
             teachers.add(daniel);
+            teacherProfilesByUser.put("daniel", 2L);
+
+            String sarahCv = seedDocLocation(3L, "Sarah_Thompson_CV.pdf");
+            String sarahCert = seedDocLocation(3L, "Sarah_Thompson_CELTA_IELTS.pdf");
+            String sarahIntro = seedDocLocation(3L, "Sarah_Thompson_Intro_Video.html");
+            String sarahDemo = seedDocLocation(3L, "Sarah_Thompson_Demo_Lesson.html");
 
             TeacherProfile sarah = new TeacherProfile(
-                    3,
+                    3L,
                     "Sarah Thompson",
-                    "sarah.thompson@example.com",
-                    "Australian",
+                    "Australia",
                     "Da Nang",
-                    "7 years",
-                    "TESOL, Master's degree",
+                    "Over 5 years",
+                    "CELTA, TEFL, IELTS",
+                    "Applied Linguistics",
+                    "Master's Degree",
+                    "Applied Linguistics",
+                    "Over $2,500",
                     "PENDING",
-                    "https://example.com/sarah-demo",
-                    "https://example.com/sarah-cv"
+                    "15/11/2026",
+                    "sarah.thompson@example.com",
+                    "+84 978 222 333",
+                    "Senior curriculum mentor and communication English instructor with 7+ years in international academies across Australia and Vietnam.",
+                    "photo/sarah_avatar.png",
+                    sarahCv,
+                    sarahCert,
+                    sarahIntro,
+                    sarahDemo,
+                    "",
+                    "1,1,1,0,0"
             );
-            sarah.setSubject("Communication English");
             sarah.setTargetAgeGroup("Adults");
-            sarah.setAvailableStartDate("11/2026");
+            sarah.setAvailableStartDate("15/11/2026");
             teachers.add(sarah);
+            teacherProfilesByUser.put("sarah", 3L);
 
             teacherIds.set(3);
 
-            // Seed default documents for teacher 1, 2, 3
-            documents.add(new TeacherDocument(documentIds.incrementAndGet(), 1L, "Emily_Martin_CV.pdf", "CV", "14/10/2026", "https://example.com/emily-cv"));
-            documents.add(new TeacherDocument(documentIds.incrementAndGet(), 1L, "CELTA_Certificate.pdf", "Certificate", "14/10/2026", "https://example.com/emily-celta"));
-            documents.add(new TeacherDocument(documentIds.incrementAndGet(), 1L, "Intro_Video_Emily.mp4", "Introductory video", "15/10/2026", "https://example.com/emily-demo"));
+            documents.add(new TeacherDocument(documentIds.incrementAndGet(), 1L, "Emily_Martin_CV.pdf", "CV", "14/10/2026", emilyCv));
+            documents.add(new TeacherDocument(documentIds.incrementAndGet(), 1L, "Emily_Martin_CELTA_TESOL.pdf", "Certificates", "14/10/2026", emilyCert));
+            documents.add(new TeacherDocument(documentIds.incrementAndGet(), 1L, "Emily_Martin_Intro_Video.html", "Intro video", "15/10/2026", emilyIntro));
+            documents.add(new TeacherDocument(documentIds.incrementAndGet(), 1L, "Emily_Martin_Demo_Lesson.html", "Teaching video", "15/10/2026", emilyDemo));
 
-            documents.add(new TeacherDocument(documentIds.incrementAndGet(), 2L, "Daniel_Walker_CV.pdf", "CV", "12/10/2026", "https://example.com/daniel-cv"));
-            documents.add(new TeacherDocument(documentIds.incrementAndGet(), 3L, "Sarah_Thompson_CV.pdf", "CV", "13/10/2026", "https://example.com/sarah-cv"));
+            documents.add(new TeacherDocument(documentIds.incrementAndGet(), 2L, "Daniel_Walker_CV.pdf", "CV", "12/10/2026", danielCv));
+            documents.add(new TeacherDocument(documentIds.incrementAndGet(), 2L, "Daniel_Walker_TESOL.pdf", "Certificates", "12/10/2026", danielCert));
+            documents.add(new TeacherDocument(documentIds.incrementAndGet(), 2L, "Daniel_Walker_Intro_Video.html", "Intro video", "12/10/2026", danielIntro));
+            documents.add(new TeacherDocument(documentIds.incrementAndGet(), 2L, "Daniel_Walker_Demo_Lesson.html", "Teaching video", "12/10/2026", danielDemo));
 
-            // Initially, the demo Partner can view teachers 1 and 2.
+            documents.add(new TeacherDocument(documentIds.incrementAndGet(), 3L, "Sarah_Thompson_CV.pdf", "CV", "13/10/2026", sarahCv));
+            documents.add(new TeacherDocument(documentIds.incrementAndGet(), 3L, "Sarah_Thompson_CELTA_IELTS.pdf", "Certificates", "13/10/2026", sarahCert));
+            documents.add(new TeacherDocument(documentIds.incrementAndGet(), 3L, "Sarah_Thompson_Intro_Video.html", "Intro video", "13/10/2026", sarahIntro));
+            documents.add(new TeacherDocument(documentIds.incrementAndGet(), 3L, "Sarah_Thompson_Demo_Lesson.html", "Teaching video", "13/10/2026", sarahDemo));
+
             granted.add("partner:1");
             granted.add("partner:2");
 
@@ -221,8 +359,13 @@ public class PortalStore {
                     LocalDateTime.of(secondSlotDate, LocalTime.of(15, 0)),
                     LocalDateTime.of(secondSlotDate, LocalTime.of(16, 0))
             ));
+            availabilitySlots.add(new AvailabilitySlot(
+                    availabilityIds.incrementAndGet(),
+                    3L,
+                    LocalDateTime.of(secondSlotDate, LocalTime.of(10, 0)),
+                    LocalDateTime.of(secondSlotDate, LocalTime.of(11, 0))
+            ));
 
-            // Demo interviews with live auto-generated working meeting room URLs
             String firstDateTime = LocalDate.now().plusDays(2).atTime(10, 0).toString();
             Interview firstInterview = new Interview(
                     1,
@@ -261,137 +404,165 @@ public class PortalStore {
         }
     }
 
-    // =========================
-    // PERSISTENCE
-    // =========================
+    public synchronized Properties toProperties() {
+        Properties props = new Properties();
+        props.setProperty("schema.version", SCHEMA_VERSION);
+        props.setProperty("seq.teacherIds", Long.toString(teacherIds.get()));
+        props.setProperty("seq.documentIds", Long.toString(documentIds.get()));
+        props.setProperty("seq.interviewIds", Long.toString(interviewIds.get()));
+        props.setProperty("seq.availabilityIds", Long.toString(availabilityIds.get()));
 
-    public synchronized void saveState() {
-        if (suppressSave) {
-            return;
+        List<AppUser> userList = new ArrayList<>(users.values());
+        props.setProperty("users.count", Integer.toString(userList.size()));
+        for (int i = 0; i < userList.size(); i++) {
+            AppUser u = userList.get(i);
+            String prefix = "user." + i + ".";
+            props.setProperty(prefix + "username", nn(u.getUsername()));
+            props.setProperty(prefix + "passwordHash", nn(u.getPasswordHash()));
+            props.setProperty(prefix + "role", nn(u.getRole()));
+            props.setProperty(prefix + "fullName", nn(u.getFullName()));
+            props.setProperty(prefix + "active", Boolean.toString(u.isActive()));
         }
+
+        List<Map.Entry<String, Long>> links = new ArrayList<>(teacherProfilesByUser.entrySet());
+        props.setProperty("teacherLinks.count", Integer.toString(links.size()));
+        for (int i = 0; i < links.size(); i++) {
+            props.setProperty("teacherLink." + i + ".username", nn(links.get(i).getKey()));
+            props.setProperty("teacherLink." + i + ".teacherId", Long.toString(links.get(i).getValue()));
+        }
+
+        props.setProperty("teachers.count", Integer.toString(teachers.size()));
+        for (int i = 0; i < teachers.size(); i++) {
+            TeacherProfile t = teachers.get(i);
+            String prefix = "teacher." + i + ".";
+            props.setProperty(prefix + "id", Long.toString(t.getId()));
+            props.setProperty(prefix + "name", nn(t.getName()));
+            props.setProperty(prefix + "fullName", nn(t.getFullName()));
+            props.setProperty(prefix + "email", nn(t.getEmail()));
+            props.setProperty(prefix + "nationality", nn(t.getNationality()));
+            props.setProperty(prefix + "location", nn(t.getLocation()));
+            props.setProperty(prefix + "experience", nn(t.getExperience()));
+            props.setProperty(prefix + "qualification", nn(t.getCertificates()));
+            props.setProperty(prefix + "certificates", nn(t.getCertificates()));
+            props.setProperty(prefix + "degree", nn(t.getDegree()));
+            props.setProperty(prefix + "major", nn(t.getMajor()));
+            props.setProperty(prefix + "expectedSalary", nn(t.getExpectedSalary()));
+            props.setProperty(prefix + "status", nn(t.getStatus()));
+            props.setProperty(prefix + "availability", nn(t.getAvailability()));
+            props.setProperty(prefix + "avatarUrl", nn(t.getAvatarUrl()));
+            props.setProperty(prefix + "videoUrl", nn(t.getVideoUrl()));
+            props.setProperty(prefix + "introVideoUrl", nn(t.getIntroVideoUrl()));
+            props.setProperty(prefix + "demoVideoUrl", nn(t.getDemoVideoUrl()));
+            props.setProperty(prefix + "cvUrl", nn(t.getCvUrl()));
+            props.setProperty(prefix + "certificateUrl", nn(t.getCertificateUrl()));
+            props.setProperty(prefix + "subject", nn(t.getSubject()));
+            props.setProperty(prefix + "bio", nn(t.getBio()));
+            props.setProperty(prefix + "phone", nn(t.getPhone()));
+            props.setProperty(prefix + "targetAgeGroup", nn(t.getTargetAgeGroup()));
+            props.setProperty(prefix + "availableStartDate", nn(t.getAvailableStartDate()));
+            props.setProperty(prefix + "timezone", nn(t.getTimezone()));
+            props.setProperty(prefix + "staffFeedback", nn(t.getStaffFeedback()));
+            props.setProperty(prefix + "reviewChecklist", nn(t.getReviewChecklist()));
+        }
+
+        props.setProperty("documents.count", Integer.toString(documents.size()));
+        for (int i = 0; i < documents.size(); i++) {
+            TeacherDocument d = documents.get(i);
+            String prefix = "document." + i + ".";
+            props.setProperty(prefix + "id", Long.toString(d.id()));
+            props.setProperty(prefix + "teacherId", Long.toString(d.teacherId()));
+            props.setProperty(prefix + "fileName", nn(d.fileName()));
+            props.setProperty(prefix + "type", nn(d.type()));
+            props.setProperty(prefix + "updatedAt", nn(d.updatedAt()));
+            props.setProperty(prefix + "location", nn(d.location()));
+        }
+
+        props.setProperty("slots.count", Integer.toString(availabilitySlots.size()));
+        for (int i = 0; i < availabilitySlots.size(); i++) {
+            AvailabilitySlot s = availabilitySlots.get(i);
+            String prefix = "slot." + i + ".";
+            props.setProperty(prefix + "id", Long.toString(s.id()));
+            props.setProperty(prefix + "teacherId", Long.toString(s.teacherId()));
+            props.setProperty(prefix + "startAt", s.startAt().toString());
+            props.setProperty(prefix + "endAt", s.endAt().toString());
+        }
+
+        List<String> grantList = new ArrayList<>(granted);
+        props.setProperty("grants.count", Integer.toString(grantList.size()));
+        for (int i = 0; i < grantList.size(); i++) {
+            props.setProperty("grant." + i, nn(grantList.get(i)));
+        }
+
+        List<Map.Entry<String, String[]>> evalList = new ArrayList<>(partnerEvaluations.entrySet());
+        props.setProperty("evals.count", Integer.toString(evalList.size()));
+        for (int i = 0; i < evalList.size(); i++) {
+            String prefix = "eval." + i + ".";
+            String[] val = evalList.get(i).getValue();
+            props.setProperty(prefix + "key", nn(evalList.get(i).getKey()));
+            props.setProperty(prefix + "decision", val != null && val.length > 0 ? nn(val[0]) : "");
+            props.setProperty(prefix + "comment", val != null && val.length > 1 ? nn(val[1]) : "");
+        }
+
+        props.setProperty("interviews.count", Integer.toString(interviews.size()));
+        for (int i = 0; i < interviews.size(); i++) {
+            Interview iv = interviews.get(i);
+            String prefix = "interview." + i + ".";
+            props.setProperty(prefix + "id", Long.toString(iv.getId()));
+            props.setProperty(prefix + "teacherId", Long.toString(iv.getTeacherId()));
+            props.setProperty(prefix + "teacherName", nn(iv.getTeacherName()));
+            props.setProperty(prefix + "partner", nn(iv.getPartner()));
+            props.setProperty(prefix + "dateTime", nn(iv.getDateTime()));
+            props.setProperty(prefix + "endDateTime", nn(iv.getEndDateTime()));
+            props.setProperty(prefix + "status", nn(iv.getStatus()));
+            props.setProperty(prefix + "result", nn(iv.getResult()));
+            props.setProperty(prefix + "feedback", nn(iv.getFeedback()));
+            props.setProperty(prefix + "meetingUrl", nn(iv.getMeetingUrl()));
+        }
+
+        props.setProperty("logs.count", Integer.toString(logs.size()));
+        for (int i = 0; i < logs.size(); i++) {
+            String[] entry = logs.get(i);
+            String prefix = "log." + i + ".";
+            props.setProperty(prefix + "time", entry.length > 0 ? nn(entry[0]) : "");
+            props.setProperty(prefix + "actor", entry.length > 1 ? nn(entry[1]) : "");
+            props.setProperty(prefix + "action", entry.length > 2 ? nn(entry[2]) : "");
+        }
+        return props;
+    }
+
+    private synchronized void saveLocalOnly() {
         try {
             Path dataDir = getDataDir();
             Files.createDirectories(dataDir);
             Path stateFile = dataDir.resolve(STATE_FILE_NAME);
             Path tempFile = dataDir.resolve(STATE_FILE_NAME + ".tmp");
-
-            Properties props = new Properties();
-            props.setProperty("seq.teacherIds", Long.toString(teacherIds.get()));
-            props.setProperty("seq.documentIds", Long.toString(documentIds.get()));
-            props.setProperty("seq.interviewIds", Long.toString(interviewIds.get()));
-            props.setProperty("seq.availabilityIds", Long.toString(availabilityIds.get()));
-
-            List<AppUser> userList = new ArrayList<>(users.values());
-            props.setProperty("users.count", Integer.toString(userList.size()));
-            for (int i = 0; i < userList.size(); i++) {
-                AppUser u = userList.get(i);
-                String prefix = "user." + i + ".";
-                props.setProperty(prefix + "username", nn(u.getUsername()));
-                props.setProperty(prefix + "passwordHash", nn(u.getPasswordHash()));
-                props.setProperty(prefix + "role", nn(u.getRole()));
-                props.setProperty(prefix + "fullName", nn(u.getFullName()));
-                props.setProperty(prefix + "active", Boolean.toString(u.isActive()));
-            }
-
-            List<Map.Entry<String, Long>> links = new ArrayList<>(teacherProfilesByUser.entrySet());
-            props.setProperty("teacherLinks.count", Integer.toString(links.size()));
-            for (int i = 0; i < links.size(); i++) {
-                props.setProperty("teacherLink." + i + ".username", nn(links.get(i).getKey()));
-                props.setProperty("teacherLink." + i + ".teacherId", Long.toString(links.get(i).getValue()));
-            }
-
-            props.setProperty("teachers.count", Integer.toString(teachers.size()));
-            for (int i = 0; i < teachers.size(); i++) {
-                TeacherProfile t = teachers.get(i);
-                String prefix = "teacher." + i + ".";
-                props.setProperty(prefix + "id", Long.toString(t.getId()));
-                props.setProperty(prefix + "name", nn(t.getName()));
-                props.setProperty(prefix + "fullName", nn(t.getFullName()));
-                props.setProperty(prefix + "email", nn(t.getEmail()));
-                props.setProperty(prefix + "nationality", nn(t.getNationality()));
-                props.setProperty(prefix + "location", nn(t.getLocation()));
-                props.setProperty(prefix + "experience", nn(t.getExperience()));
-                props.setProperty(prefix + "qualification", nn(t.getQualification()));
-                props.setProperty(prefix + "status", nn(t.getStatus()));
-                props.setProperty(prefix + "videoUrl", nn(t.getVideoUrl()));
-                props.setProperty(prefix + "cvUrl", nn(t.getCvUrl()));
-                props.setProperty(prefix + "subject", nn(t.getSubject()));
-                props.setProperty(prefix + "bio", nn(t.getBio()));
-                props.setProperty(prefix + "phone", nn(t.getPhone()));
-                props.setProperty(prefix + "targetAgeGroup", nn(t.getTargetAgeGroup()));
-                props.setProperty(prefix + "availableStartDate", nn(t.getAvailableStartDate()));
-                props.setProperty(prefix + "timezone", nn(t.getTimezone()));
-            }
-
-            props.setProperty("documents.count", Integer.toString(documents.size()));
-            for (int i = 0; i < documents.size(); i++) {
-                TeacherDocument d = documents.get(i);
-                String prefix = "document." + i + ".";
-                props.setProperty(prefix + "id", Long.toString(d.id()));
-                props.setProperty(prefix + "teacherId", Long.toString(d.teacherId()));
-                props.setProperty(prefix + "fileName", nn(d.fileName()));
-                props.setProperty(prefix + "type", nn(d.type()));
-                props.setProperty(prefix + "updatedAt", nn(d.updatedAt()));
-                props.setProperty(prefix + "location", nn(d.location()));
-            }
-
-            props.setProperty("slots.count", Integer.toString(availabilitySlots.size()));
-            for (int i = 0; i < availabilitySlots.size(); i++) {
-                AvailabilitySlot s = availabilitySlots.get(i);
-                String prefix = "slot." + i + ".";
-                props.setProperty(prefix + "id", Long.toString(s.id()));
-                props.setProperty(prefix + "teacherId", Long.toString(s.teacherId()));
-                props.setProperty(prefix + "startAt", s.startAt().toString());
-                props.setProperty(prefix + "endAt", s.endAt().toString());
-            }
-
-            List<String> grantList = new ArrayList<>(granted);
-            props.setProperty("grants.count", Integer.toString(grantList.size()));
-            for (int i = 0; i < grantList.size(); i++) {
-                props.setProperty("grant." + i, nn(grantList.get(i)));
-            }
-
-            List<Map.Entry<String, String[]>> evalList = new ArrayList<>(partnerEvaluations.entrySet());
-            props.setProperty("evals.count", Integer.toString(evalList.size()));
-            for (int i = 0; i < evalList.size(); i++) {
-                String prefix = "eval." + i + ".";
-                String[] val = evalList.get(i).getValue();
-                props.setProperty(prefix + "key", nn(evalList.get(i).getKey()));
-                props.setProperty(prefix + "decision", val != null && val.length > 0 ? nn(val[0]) : "");
-                props.setProperty(prefix + "comment", val != null && val.length > 1 ? nn(val[1]) : "");
-            }
-
-            props.setProperty("interviews.count", Integer.toString(interviews.size()));
-            for (int i = 0; i < interviews.size(); i++) {
-                Interview iv = interviews.get(i);
-                String prefix = "interview." + i + ".";
-                props.setProperty(prefix + "id", Long.toString(iv.getId()));
-                props.setProperty(prefix + "teacherId", Long.toString(iv.getTeacherId()));
-                props.setProperty(prefix + "teacherName", nn(iv.getTeacherName()));
-                props.setProperty(prefix + "partner", nn(iv.getPartner()));
-                props.setProperty(prefix + "dateTime", nn(iv.getDateTime()));
-                props.setProperty(prefix + "endDateTime", nn(iv.getEndDateTime()));
-                props.setProperty(prefix + "status", nn(iv.getStatus()));
-                props.setProperty(prefix + "result", nn(iv.getResult()));
-                props.setProperty(prefix + "feedback", nn(iv.getFeedback()));
-                props.setProperty(prefix + "meetingUrl", nn(iv.getMeetingUrl()));
-            }
-
-            props.setProperty("logs.count", Integer.toString(logs.size()));
-            for (int i = 0; i < logs.size(); i++) {
-                String[] entry = logs.get(i);
-                String prefix = "log." + i + ".";
-                props.setProperty(prefix + "time", entry.length > 0 ? nn(entry[0]) : "");
-                props.setProperty(prefix + "actor", entry.length > 1 ? nn(entry[1]) : "");
-                props.setProperty(prefix + "action", entry.length > 2 ? nn(entry[2]) : "");
-            }
-
+            Properties props = toProperties();
             try (OutputStream out = Files.newOutputStream(tempFile)) {
                 props.store(out, "TeacherMatch PortalStore persistent state");
             }
             Files.move(tempFile, stateFile, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException ex) {
-            // Keep working in-memory if disk is temporarily unavailable
+        } catch (IOException ignored) {
+        }
+    }
+
+    public synchronized void saveState() {
+        if (suppressSave) {
+            return;
+        }
+        Properties props = toProperties();
+        try {
+            Path dataDir = getDataDir();
+            Files.createDirectories(dataDir);
+            Path stateFile = dataDir.resolve(STATE_FILE_NAME);
+            Path tempFile = dataDir.resolve(STATE_FILE_NAME + ".tmp");
+            try (OutputStream out = Files.newOutputStream(tempFile)) {
+                props.store(out, "TeacherMatch PortalStore persistent state");
+            }
+            Files.move(tempFile, stateFile, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException ignored) {
+        }
+        if (cloudSync != null && cloudSync.isEnabled()) {
+            cloudSync.pushProperties(props);
         }
     }
 
@@ -405,7 +576,13 @@ public class PortalStore {
         } catch (IOException | IllegalArgumentException ex) {
             return false;
         }
+        return loadFromProperties(props);
+    }
 
+    public synchronized boolean loadFromProperties(Properties props) {
+        if (props == null) {
+            return false;
+        }
         int userCount = parseInt(props.getProperty("users.count"), -1);
         if (userCount <= 0) {
             return false;
@@ -445,28 +622,49 @@ public class PortalStore {
             for (int i = 0; i < teacherCount; i++) {
                 String prefix = "teacher." + i + ".";
                 long id = parseLong(props.getProperty(prefix + "id"), i + 1L);
-                String name = props.getProperty(prefix + "name", "");
+                String name = props.getProperty(prefix + "fullName", props.getProperty(prefix + "name", ""));
+                String certs = props.getProperty(prefix + "certificates", props.getProperty(prefix + "qualification", ""));
+                String subject = props.getProperty(prefix + "subject", "English Education");
+                String degree = props.getProperty(prefix + "degree", defaultDegreeForId(id, certs));
+                String major = props.getProperty(prefix + "major", defaultMajorForId(id, subject));
+                String expectedSalary = props.getProperty(prefix + "expectedSalary", defaultSalaryForId(id));
+                String rawExp = props.getProperty(prefix + "experience", "3–5 years");
+                String normalizedExp = CatalogData.normalizeExperienceBand(rawExp);
+                String rawNation = props.getProperty(prefix + "nationality", defaultNationalityForId(id));
+                String normalizedNation = normalizeLegacyNationality(rawNation, id);
+                String avatarUrl = props.getProperty(prefix + "avatarUrl", defaultAvatarForId(id));
+                String cvUrl = upgradeSampleDocPath(id, props.getProperty(prefix + "cvUrl", ""), "CV");
+                String certUrl = upgradeSampleDocPath(id, props.getProperty(prefix + "certificateUrl", ""), "Certificates");
+                String videoUrl = props.getProperty(prefix + "videoUrl", "");
+                String introUrl = upgradeSampleDocPath(id, props.getProperty(prefix + "introVideoUrl", videoUrl), "Intro video");
+                String demoUrl = upgradeSampleDocPath(id, props.getProperty(prefix + "demoVideoUrl", videoUrl), "Teaching video");
+
                 TeacherProfile t = new TeacherProfile(
                         id,
                         name,
+                        normalizedNation,
+                        props.getProperty(prefix + "location", "Ho Chi Minh City"),
+                        normalizedExp,
+                        certs,
+                        subject,
+                        degree,
+                        major,
+                        expectedSalary,
+                        props.getProperty(prefix + "status", "PENDING"),
+                        props.getProperty(prefix + "availability", "01/12/2026"),
                         props.getProperty(prefix + "email", ""),
-                        props.getProperty(prefix + "nationality", ""),
-                        props.getProperty(prefix + "location", ""),
-                        props.getProperty(prefix + "experience", ""),
-                        props.getProperty(prefix + "qualification", ""),
-                        props.getProperty(prefix + "status", "DRAFT"),
-                        props.getProperty(prefix + "videoUrl", ""),
-                        props.getProperty(prefix + "cvUrl", "")
+                        props.getProperty(prefix + "phone", ""),
+                        props.getProperty(prefix + "bio", ""),
+                        avatarUrl,
+                        cvUrl,
+                        certUrl,
+                        introUrl,
+                        demoUrl,
+                        props.getProperty(prefix + "staffFeedback", ""),
+                        props.getProperty(prefix + "reviewChecklist", id <= 2 ? "1,1,1,1,1" : "1,1,1,0,0")
                 );
-                String fullName = props.getProperty(prefix + "fullName", name);
-                if (!fullName.isBlank()) {
-                    t.setFullName(fullName);
-                }
-                t.setSubject(props.getProperty(prefix + "subject", "English (ESL)"));
-                t.setBio(props.getProperty(prefix + "bio", ""));
-                t.setPhone(props.getProperty(prefix + "phone", ""));
-                t.setTargetAgeGroup(props.getProperty(prefix + "targetAgeGroup", ""));
-                t.setAvailableStartDate(props.getProperty(prefix + "availableStartDate", ""));
+                t.setTargetAgeGroup(props.getProperty(prefix + "targetAgeGroup", "Primary (6-11)"));
+                t.setAvailableStartDate(props.getProperty(prefix + "availableStartDate", "01/12/2026"));
                 t.setTimezone(props.getProperty(prefix + "timezone", "UTC+7 (Vietnam)"));
                 teachers.add(t);
                 if (id > teacherIds.get()) {
@@ -482,7 +680,7 @@ public class PortalStore {
                 String fileName = props.getProperty(prefix + "fileName", "");
                 String type = props.getProperty(prefix + "type", "CV");
                 String updatedAt = props.getProperty(prefix + "updatedAt", "");
-                String location = props.getProperty(prefix + "location", "");
+                String location = upgradeSampleDocPath(teacherId, props.getProperty(prefix + "location", ""), type);
                 if (!fileName.isBlank()) {
                     documents.add(new TeacherDocument(id, teacherId, fileName, type, updatedAt, location));
                     if (id > documentIds.get()) {
@@ -490,6 +688,8 @@ public class PortalStore {
                     }
                 }
             }
+
+            ensureCoreTeacherDocuments();
 
             int slotCount = parseInt(props.getProperty("slots.count"), 0);
             for (int i = 0; i < slotCount; i++) {
@@ -570,6 +770,115 @@ public class PortalStore {
         }
     }
 
+    private void ensureCoreTeacherDocuments() {
+        for (TeacherProfile t : teachers) {
+            long tid = t.getId();
+            if (tid >= 1L && tid <= 3L) {
+                List<TeacherDocument> existing = documents(tid);
+                if (existing.size() < 4) {
+                    String prefix = tid == 1L ? "Emily_Martin" : (tid == 2L ? "Daniel_Walker" : "Sarah_Thompson");
+                    String certFile = tid == 1L ? "Emily_Martin_CELTA_TESOL.pdf"
+                            : (tid == 2L ? "Daniel_Walker_TESOL.pdf" : "Sarah_Thompson_CELTA_IELTS.pdf");
+                    ensureDocIfMissing(tid, prefix + "_CV.pdf", "CV", "14/10/2026");
+                    ensureDocIfMissing(tid, certFile, "Certificates", "14/10/2026");
+                    ensureDocIfMissing(tid, prefix + "_Intro_Video.html", "Intro video", "15/10/2026");
+                    ensureDocIfMissing(tid, prefix + "_Demo_Lesson.html", "Teaching video", "15/10/2026");
+                }
+            }
+        }
+    }
+
+    private void ensureDocIfMissing(long teacherId, String sampleFile, String type, String date) {
+        boolean present = documents.stream().anyMatch(d -> d.teacherId() == teacherId && d.type().equalsIgnoreCase(type));
+        if (!present) {
+            String loc = seedDocLocation(teacherId, sampleFile);
+            documents.add(new TeacherDocument(documentIds.incrementAndGet(), teacherId, sampleFile, type, date, loc));
+        }
+    }
+
+    private String upgradeSampleDocPath(long teacherId, String existingLocation, String type) {
+        if (existingLocation != null && !existingLocation.isBlank()
+                && !existingLocation.contains("example.com")) {
+            return existingLocation;
+        }
+        if (teacherId < 1L || teacherId > 3L) {
+            return existingLocation == null ? "" : existingLocation;
+        }
+        String prefix = teacherId == 1L ? "Emily_Martin" : (teacherId == 2L ? "Daniel_Walker" : "Sarah_Thompson");
+        String certFile = teacherId == 1L ? "Emily_Martin_CELTA_TESOL.pdf"
+                : (teacherId == 2L ? "Daniel_Walker_TESOL.pdf" : "Sarah_Thompson_CELTA_IELTS.pdf");
+        String t = type == null ? "" : type.toLowerCase(Locale.ROOT);
+        if (t.contains("cv")) {
+            return seedDocLocation(teacherId, prefix + "_CV.pdf");
+        }
+        if (t.contains("cert")) {
+            return seedDocLocation(teacherId, certFile);
+        }
+        if (t.contains("demo") || t.contains("teaching")) {
+            return seedDocLocation(teacherId, prefix + "_Demo_Lesson.html");
+        }
+        if (t.contains("intro") || t.contains("video")) {
+            return seedDocLocation(teacherId, prefix + "_Intro_Video.html");
+        }
+        return existingLocation == null ? "" : existingLocation;
+    }
+
+    private static String normalizeLegacyNationality(String raw, long id) {
+        if (raw == null || raw.isBlank()) {
+            return defaultNationalityForId(id);
+        }
+        return switch (raw.trim().toLowerCase(Locale.ROOT)) {
+            case "american", "usa", "u.s.a." -> "United States";
+            case "british", "uk", "english" -> "United Kingdom";
+            case "australian" -> "Australia";
+            case "canadian" -> "Canada";
+            default -> raw.trim();
+        };
+    }
+
+    private static String defaultNationalityForId(long id) {
+        return switch ((int) id) {
+            case 1 -> "United Kingdom";
+            case 2 -> "Canada";
+            case 3 -> "Australia";
+            default -> "United States";
+        };
+    }
+
+    private static String defaultDegreeForId(long id, String certs) {
+        if (certs != null && certs.toLowerCase(Locale.ROOT).contains("master")) {
+            return "Master's Degree";
+        }
+        return (id == 2L || id == 3L) ? "Master's Degree" : "Bachelor's Degree";
+    }
+
+    private static String defaultMajorForId(long id, String subject) {
+        return switch ((int) id) {
+            case 1 -> "English Education";
+            case 2 -> "TESOL & Applied Linguistics";
+            case 3 -> "Applied Linguistics";
+            default -> (subject == null || subject.isBlank()) ? "English Education" : subject;
+        };
+    }
+
+    private static String defaultSalaryForId(long id) {
+        return switch ((int) id) {
+            case 1 -> "$1,500 - $2,000";
+            case 2 -> "$2,000 - $2,500";
+            case 3 -> "Over $2,500";
+            default -> "$1,500 - $2,000";
+        };
+    }
+
+    public static String defaultAvatarForId(long id) {
+        return switch ((int) id) {
+            case 1 -> "photo/emily_avatar.png";
+            case 2 -> "photo/daniel_avatar.png";
+            case 3 -> "photo/sarah_avatar.png";
+            default -> "";
+        };
+    }
+
     private static String nn(String value) {
         return value == null ? "" : value;
     }
@@ -592,10 +901,6 @@ public class PortalStore {
         }
     }
 
-    // =========================
-    // USERS
-    // =========================
-
     public synchronized Collection<AppUser> users() {
         return List.copyOf(users.values());
     }
@@ -617,7 +922,12 @@ public class PortalStore {
         if (username == null || password == null) {
             return null;
         }
-        AppUser user = users.get(username);
+        String trimmedUser = username.trim();
+        AppUser user = users.get(trimmedUser);
+        if (user == null && cloudSync != null && cloudSync.isEnabled()) {
+            syncFromCloud();
+            user = users.get(trimmedUser);
+        }
         if (user == null || !user.isActive()) {
             return null;
         }
@@ -754,10 +1064,6 @@ public class PortalStore {
         return true;
     }
 
-    // =========================
-    // TEACHER PROFILES & DOCUMENTS
-    // =========================
-
     public synchronized List<TeacherProfile> teachers() {
         return List.copyOf(teachers);
     }
@@ -813,14 +1119,18 @@ public class PortalStore {
                 newId,
                 displayName,
                 user.getUsername() + "@example.com",
-                "American",
+                "United States",
                 "Ho Chi Minh City",
-                "1-3 years",
+                "1–2 years",
                 "TEFL",
                 "DRAFT",
                 "",
                 ""
         );
+        created.setDegree("Bachelor's Degree");
+        created.setMajor("English Education");
+        created.setExpectedSalary("$1,500 - $2,000");
+        created.setReviewChecklist("0,0,0,0,0");
         teachers.add(created);
         teacherProfilesByUser.put(user.getUsername(), newId);
         return created;
@@ -846,16 +1156,25 @@ public class PortalStore {
             target.setNationality(updated.getNationality());
             target.setLocation(updated.getLocation());
             target.setExperience(updated.getExperience());
-            target.setQualification(updated.getQualification());
+            target.setCertificates(updated.getCertificates());
+            target.setDegree(updated.getDegree());
+            target.setMajor(updated.getMajor());
+            target.setExpectedSalary(updated.getExpectedSalary());
             target.setStatus(updated.getStatus());
-            target.setVideoUrl(updated.getVideoUrl());
+            target.setAvailability(updated.getAvailability());
+            target.setAvatarUrl(updated.getAvatarUrl());
             target.setCvUrl(updated.getCvUrl());
+            target.setCertificateUrl(updated.getCertificateUrl());
+            target.setIntroVideoUrl(updated.getIntroVideoUrl());
+            target.setDemoVideoUrl(updated.getDemoVideoUrl());
             target.setSubject(updated.getSubject());
             target.setBio(updated.getBio());
             target.setPhone(updated.getPhone());
             target.setTargetAgeGroup(updated.getTargetAgeGroup());
             target.setAvailableStartDate(updated.getAvailableStartDate());
             target.setTimezone(updated.getTimezone());
+            target.setStaffFeedback(updated.getStaffFeedback());
+            target.setReviewChecklist(updated.getReviewChecklist());
         }
         for (Interview iv : interviews) {
             if (iv.getTeacherId() == target.getId()) {
@@ -865,6 +1184,70 @@ public class PortalStore {
         log(actor, "Saved profile for " + target.getName() + " (" + target.getStatus() + ")");
         saveState();
         return true;
+    }
+
+    public synchronized boolean saveReviewState(
+            String actor,
+            long teacherId,
+            String status,
+            String staffFeedback,
+            boolean[] checklistFlags,
+            String bioOverride
+    ) {
+        String role = userRole(actor);
+        if (!("STAFF".equals(role) || "ADMIN".equals(role))) {
+            return false;
+        }
+        TeacherProfile teacher = teacher(teacherId);
+        if (teacher == null) {
+            return false;
+        }
+        if (checklistFlags != null && checklistFlags.length > 0) {
+            teacher.setChecklistFlags(checklistFlags);
+        }
+        if (staffFeedback != null) {
+            teacher.setStaffFeedback(staffFeedback.trim());
+        }
+        if (bioOverride != null && !bioOverride.isBlank()) {
+            teacher.setBio(bioOverride.trim());
+        }
+        if (status != null && !status.isBlank()) {
+            String normalizedStatus = CatalogData.normalizeStatusCode(status);
+            teacher.setStatus(normalizedStatus);
+        }
+        log(actor, "Reviewed profile for " + teacher.getName() + " -> " + teacher.getStatus());
+        saveState();
+        return true;
+    }
+
+    public synchronized String updateTeacherAvatar(String actor, long teacherId, Path sourceImage) {
+        String role = userRole(actor);
+        boolean isStaffOrAdmin = "STAFF".equals(role) || "ADMIN".equals(role);
+        boolean isOwner = "TEACHER".equals(role) && teacherIdForUser(actor) == teacherId;
+        if (!isStaffOrAdmin && !isOwner) {
+            return null;
+        }
+        TeacherProfile teacher = teacher(teacherId);
+        if (teacher == null || sourceImage == null || !Files.isRegularFile(sourceImage)) {
+            return null;
+        }
+        try {
+            Path targetDir = getDataDir().resolve("documents").resolve(Long.toString(teacherId));
+            Files.createDirectories(targetDir);
+            String safeName = "avatar_" + teacherId + "_" + sourceImage.getFileName().toString().replaceAll("[^a-zA-Z0-9._-]", "_");
+            Path dest = targetDir.resolve(safeName);
+            Files.copy(sourceImage, dest, StandardCopyOption.REPLACE_EXISTING);
+            String storedPath = dest.toAbsolutePath().toString();
+            teacher.setAvatarUrl(storedPath);
+            if (cloudSync != null && cloudSync.isEnabled()) {
+                cloudSync.uploadSharedFile("avatar:" + teacherId, teacherId, safeName, dest);
+            }
+            log(actor, "Updated profile avatar for " + teacher.getName());
+            saveState();
+            return storedPath;
+        } catch (IOException ex) {
+            return null;
+        }
     }
 
     public synchronized List<TeacherDocument> documents(long teacherId) {
@@ -891,6 +1274,8 @@ public class PortalStore {
             return null;
         }
         String storedLocation = sourcePathOrUrl == null ? "" : sourcePathOrUrl.trim();
+        Path copiedLocalFile = null;
+        String safeFileName = fileName.trim().replaceAll("[^a-zA-Z0-9._-]", "_");
         if (!storedLocation.isEmpty() && !storedLocation.startsWith("http://") && !storedLocation.startsWith("https://")) {
             try {
                 Path src = storedLocation.startsWith("file:")
@@ -899,10 +1284,12 @@ public class PortalStore {
                 if (Files.isRegularFile(src)) {
                     Path targetDir = getDataDir().resolve("documents").resolve(Long.toString(teacherId));
                     Files.createDirectories(targetDir);
-                    String safeName = fileName.trim().replaceAll("[^a-zA-Z0-9._-]", "_");
-                    Path dest = targetDir.resolve(safeName);
-                    Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING);
-                    storedLocation = dest.toAbsolutePath().toString();
+                    Path dest = targetDir.resolve(safeFileName);
+                    if (!src.toAbsolutePath().equals(dest.toAbsolutePath())) {
+                        Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                    copiedLocalFile = dest.toAbsolutePath();
+                    storedLocation = copiedLocalFile.toString();
                 }
             } catch (Exception ignored) {
             }
@@ -923,7 +1310,7 @@ public class PortalStore {
         int existingIndex = -1;
         for (int i = 0; i < documents.size(); i++) {
             TeacherDocument item = documents.get(i);
-            if (item.teacherId() == teacherId && item.type().equalsIgnoreCase(type.trim())) {
+            if (item.teacherId() == teacherId && isSameDocCategory(item.type(), type.trim())) {
                 existingIndex = i;
                 break;
             }
@@ -934,10 +1321,93 @@ public class PortalStore {
             documents.add(doc);
         }
 
+        if (copiedLocalFile != null && cloudSync != null && cloudSync.isEnabled()) {
+            String fileKey = "doc:" + teacherId + ":" + normalizeDocCategoryKey(type);
+            cloudSync.uploadSharedFile(fileKey, teacherId, safeFileName, copiedLocalFile);
+        }
+
         syncTeacherDocumentFields(teacher, doc.type(), storedLocation, doc.fileName());
         log(actor, "Updated document (" + type.trim() + "): " + fileName.trim());
         saveState();
         return doc;
+    }
+
+    private static boolean isSameDocCategory(String a, String b) {
+        return normalizeDocCategoryKey(a).equals(normalizeDocCategoryKey(b));
+    }
+
+    public static String normalizeDocCategoryKey(String type) {
+        if (type == null) return "other";
+        String lower = type.trim().toLowerCase(Locale.ROOT);
+        if (lower.contains("cv") || lower.contains("resume")) return "cv";
+        if (lower.contains("cert")) return "certificates";
+        if (lower.contains("intro")) return "intro_video";
+        if (lower.contains("demo") || lower.contains("teaching")) return "teaching_video";
+        return lower.replaceAll("[^a-z0-9]+", "_");
+    }
+
+    public synchronized Path resolveDocumentLocalFile(TeacherDocument doc) {
+        if (doc == null || doc.location() == null || doc.location().isBlank()) {
+            return null;
+        }
+        String loc = doc.location().trim();
+        if (loc.startsWith("http://") || loc.startsWith("https://")) {
+            return null;
+        }
+        try {
+            Path p = loc.startsWith("file:") ? Paths.get(java.net.URI.create(loc)) : Paths.get(loc);
+            if (Files.isRegularFile(p)) {
+                return p;
+            }
+        } catch (Exception ignored) {
+        }
+        String safeName = doc.fileName().replaceAll("[^a-zA-Z0-9._-]", "_");
+        Path localTarget = getDataDir().resolve("documents").resolve(Long.toString(doc.teacherId())).resolve(safeName);
+        if (Files.isRegularFile(localTarget)) {
+            return localTarget;
+        }
+        if (cloudSync != null && cloudSync.isEnabled()) {
+            String key = "doc:" + doc.teacherId() + ":" + normalizeDocCategoryKey(doc.type());
+            if (cloudSync.downloadSharedFileIfMissing(key, localTarget)) {
+                return localTarget;
+            }
+        }
+        return materializeBundledResource("/com/example/tmver36/samples/" + doc.fileName(), doc.teacherId(), safeName);
+    }
+
+    public synchronized boolean openDocument(String actor, TeacherDocument doc) {
+        if (doc == null) {
+            return false;
+        }
+        String loc = doc.location() == null ? "" : doc.location().trim();
+        if (loc.startsWith("http://") || loc.startsWith("https://")) {
+            boolean ok = openInBrowser(loc);
+            if (ok) {
+                log(actor, "Opened document URL " + doc.fileName());
+            }
+            return ok;
+        }
+        Path local = resolveDocumentLocalFile(doc);
+        if (local == null || !Files.isRegularFile(local)) {
+            return false;
+        }
+        if (Boolean.getBoolean("tm.test.suppressAlerts")) {
+            log(actor, "Opened document " + doc.fileName());
+            return true;
+        }
+        try {
+            if (java.awt.Desktop.isDesktopSupported()) {
+                java.awt.Desktop.getDesktop().open(local.toFile());
+                log(actor, "Opened document " + doc.fileName());
+                return true;
+            }
+        } catch (Exception ignored) {
+        }
+        boolean ok = openInBrowser(local.toUri().toString());
+        if (ok) {
+            log(actor, "Opened document " + doc.fileName());
+        }
+        return ok;
     }
 
     public synchronized boolean removeDocument(String actor, long teacherId, long documentId) {
@@ -957,10 +1427,12 @@ public class PortalStore {
         documents.remove(target);
         TeacherProfile teacher = teacher(teacherId);
         if (teacher != null) {
-            if ("CV".equalsIgnoreCase(target.type())) {
-                teacher.setCvUrl("");
-            } else if (target.type().toLowerCase().contains("video")) {
-                teacher.setVideoUrl("");
+            String key = normalizeDocCategoryKey(target.type());
+            switch (key) {
+                case "cv" -> teacher.setCvUrl("");
+                case "certificates" -> teacher.setCertificateUrl("");
+                case "intro_video" -> teacher.setIntroVideoUrl("");
+                case "teaching_video" -> teacher.setDemoVideoUrl("");
             }
         }
         log(actor, "Deleted document (" + target.type() + "): " + target.fileName());
@@ -969,18 +1441,24 @@ public class PortalStore {
     }
 
     private void syncTeacherDocumentFields(TeacherProfile teacher, String type, String location, String fileName) {
-        if ("CV".equalsIgnoreCase(type)) {
-            teacher.setCvUrl(location);
-        } else if (type.toLowerCase().contains("video")) {
-            teacher.setVideoUrl(location);
-        } else if ("Certificate".equalsIgnoreCase(type) && (teacher.getQualification() == null || teacher.getQualification().isBlank())) {
-            teacher.setQualification(fileName);
+        String key = normalizeDocCategoryKey(type);
+        switch (key) {
+            case "cv" -> teacher.setCvUrl(location);
+            case "certificates" -> {
+                teacher.setCertificateUrl(location);
+                if (teacher.getCertificates() == null || teacher.getCertificates().isBlank()) {
+                    teacher.setCertificates(fileName);
+                }
+            }
+            case "intro_video" -> teacher.setIntroVideoUrl(location);
+            case "teaching_video" -> teacher.setDemoVideoUrl(location);
+            default -> {
+                if (type != null && type.toLowerCase(Locale.ROOT).contains("video")) {
+                    teacher.setVideoUrl(location);
+                }
+            }
         }
     }
-
-    // =========================
-    // AVAILABILITY SLOTS
-    // =========================
 
     public synchronized List<AvailabilitySlot> availabilitySlots(long teacherId) {
         return availabilitySlots.stream()
@@ -1031,10 +1509,6 @@ public class PortalStore {
         return true;
     }
 
-    // =========================
-    // ACCESS CONTROL & STATUS
-    // =========================
-
     public synchronized List<TeacherProfile> visibleTeachers(String username, String role) {
         String authenticatedRole = userRole(username);
         if ("STAFF".equals(authenticatedRole) || "ADMIN".equals(authenticatedRole)) {
@@ -1059,6 +1533,17 @@ public class PortalStore {
             return false;
         }
         return granted.contains(username + ":" + teacherId);
+    }
+
+    public synchronized int countPartnersGrantedForTeacher(long teacherId) {
+        String suffix = ":" + teacherId;
+        int count = 0;
+        for (String entry : granted) {
+            if (entry != null && entry.endsWith(suffix)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     public synchronized void grant(String username, long teacherId) {
@@ -1121,23 +1606,20 @@ public class PortalStore {
         if (teacher == null || status == null || status.isBlank()) {
             return false;
         }
+        String normalized = CatalogData.normalizeStatusCode(status);
         boolean staff = "STAFF".equals(role) || "ADMIN".equals(role);
         boolean teacherOwner = "TEACHER".equals(role) && teacherIdForUser(actor) == id;
-        if (!staff && !(teacherOwner && ("PENDING".equals(status) || "DRAFT".equals(status)))) {
+        if (!staff && !(teacherOwner && ("PENDING".equals(normalized) || "DRAFT".equals(normalized)))) {
             return false;
         }
-        if (!Set.of("DRAFT", "PENDING", "READY", "UPDATE_REQUIRED").contains(status)) {
+        if (!Set.of("DRAFT", "PENDING", "READY", "UPDATE_REQUIRED").contains(normalized)) {
             return false;
         }
-        teacher.setStatus(status);
-        log(actor, "Updated " + teacher.getName() + " status to " + status);
+        teacher.setStatus(normalized);
+        log(actor, "Updated " + teacher.getName() + " status to " + normalized);
         saveState();
         return true;
     }
-
-    // =========================
-    // INTERVIEWS
-    // =========================
 
     public synchronized List<Interview> interviews() {
         return List.copyOf(interviews);
@@ -1341,35 +1823,30 @@ public class PortalStore {
             return false;
         }
         String trimmed = url.trim();
-        if (!(trimmed.startsWith("https://") || trimmed.startsWith("http://"))) {
-            return false;
+        if (!(trimmed.startsWith("https://") || trimmed.startsWith("http://") || trimmed.startsWith("file:"))) {
+            File local = new File(trimmed);
+            if (local.exists()) {
+                trimmed = local.toURI().toString();
+            } else {
+                return false;
+            }
         }
         if (Boolean.getBoolean("tm.test.suppressAlerts")) {
             return true;
         }
         try {
-            if (java.awt.Desktop.isDesktopSupported()
-                    && java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.BROWSE)) {
-                java.awt.Desktop.getDesktop().browse(java.net.URI.create(trimmed));
-                return true;
+            if (java.awt.Desktop.isDesktopSupported()) {
+                if (trimmed.startsWith("file:")) {
+                    java.awt.Desktop.getDesktop().open(new File(java.net.URI.create(trimmed)));
+                    return true;
+                } else if (java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.BROWSE)) {
+                    java.awt.Desktop.getDesktop().browse(java.net.URI.create(trimmed));
+                    return true;
+                }
             }
         } catch (Exception ignored) {
         }
-        try {
-            String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-            if (os.contains("win")) {
-                new ProcessBuilder("rundll32", "url.dll,FileProtocolHandler", trimmed).start();
-                return true;
-            } else if (os.contains("mac")) {
-                new ProcessBuilder("open", trimmed).start();
-                return true;
-            } else {
-                new ProcessBuilder("xdg-open", trimmed).start();
-                return true;
-            }
-        } catch (Exception ignored) {
-            return false;
-        }
+        return false;
     }
 
     private static String slugify(String input, String fallback) {
@@ -1400,10 +1877,6 @@ public class PortalStore {
                 .findFirst()
                 .orElse(null);
     }
-
-    // =========================
-    // SYSTEM LOGS
-    // =========================
 
     public synchronized List<String[]> logs() {
         return List.copyOf(logs);

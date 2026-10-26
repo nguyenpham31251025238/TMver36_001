@@ -97,3 +97,25 @@ Các file xuất ra tại thư mục `dist/`:
 ## 5. Tài Liệu Chi Tiết
 
 Xem báo cáo kiểm tra, danh sách lỗi đã sửa và kết quả kiểm thử chi tiết tại [`docs/PROGRESS.md`](docs/PROGRESS.md).
+
+---
+
+## 6. Đồng Bộ Đa Thiết Bị (Shared Cloud Database) & Nâng Cấp UI/UX Toàn Diện
+
+### 6.1. Đồng bộ đa thiết bị qua Supabase Cloud (`CloudSyncService`)
+- Ngoài tệp lưu trữ cục bộ `~/.tmver36_001/portal-store.properties`, `PortalStore` tự động đồng bộ hai chiều với cơ sở dữ liệu đám mây dùng chung (**Supabase PostgreSQL**: bảng `public.tm_portal_state` và `public.tm_shared_files`).
+- Khi tạo tài khoản mới, cập nhật hồ sơ, tải lên ảnh đại diện/tài liệu, duyệt trạng thái (`qCV` / `qEP` / `Update Required`), hoặc đặt lịch phỏng vấn trên một máy, các máy khác sẽ tự động nhận được dữ liệu mới khi đăng nhập hoặc bấm **Sync Cloud**.
+- **Biến môi trường tùy chỉnh (nếu dùng project Supabase riêng):**
+  - `TM_SUPABASE_URL` (hoặc JVM `-Dtm.supabase.url=...`)
+  - `TM_SUPABASE_KEY` (hoặc JVM `-Dtm.supabase.key=...`)
+  - `TM_CLOUD_SYNC=false` (hoặc `-Dtm.cloud.sync=false` để chạy thuần cục bộ khi kiểm thử cô lập).
+
+### 6.2. Hệ thống Thẻ Hồ Sơ (Shopee-inspired Profile Card Grid) & Chuẩn hóa Bộ lọc
+- **Thẻ hồ sơ chuyên nghiệp (`ProfileCardBuilder`):** Hiển thị ảnh đại diện riêng của từng giáo viên (`emily_avatar.png`, `daniel_avatar.png`, `sarah_avatar.png` hoặc ảnh tải lên), trạng thái `qEP` / `qCV` / `Update Required`, quốc tịch, bằng cấp (`Degree`), chuyên ngành (`Major`), kinh nghiệm, thẻ chứng chỉ (`CELTA`, `TEFL`, `TESOL`, `IELTS`...) và mức lương kỳ vọng (`Expected Salary`) nổi bật kèm các nút thao tác nhanh theo từng vai trò.
+- **Bộ lọc chuẩn hóa đồng bộ giữa Staff và Partner:**
+  - **Nationality:** Danh sách đầy đủ hơn 195 quốc gia xếp theo A–Z, hỗ trợ gõ tìm kiếm nhanh và lựa chọn `Other`.
+  - **Experience:** 4 mức chuẩn (`Under 1 year`, `1–2 years`, `3–5 years`, `Over 5 years`).
+  - **Certificates:** Chọn nhiều chứng chỉ cùng lúc (`Multi-select MenuButton`: `CELTA`, `TEFL`, `TESOL`, `IELTS`, `TOEFL`, `DELTA`, `Cambridge TKT`, `PGCE`).
+  - **Major / Degree:** Lọc theo chuyên ngành giảng dạy và bằng cấp (`Bachelor's Degree`, `Master's Degree`...), thay thế cho bộ lọc Location cũ.
+  - **Expected Salary:** Lọc theo mức lương kỳ vọng (`Under $1,500`, `$1,500 - $2,000`, `$2,000 - $2,500`, `Over $2,500`).
+  - **Status:** Sử dụng mã nghiệp vụ `qCV` (Pending verification), `qEP` (Ready for Partner), và `Update Required`.

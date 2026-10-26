@@ -16,6 +16,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -83,6 +84,10 @@ class PortalStoreTest {
         assertNotNull(emily);
         emily.setFullName("Emily Grace Martin");
         emily.setSubject("IELTS / Academic English");
+        emily.setDegree("Master's Degree");
+        emily.setMajor("Applied Linguistics");
+        emily.setExpectedSalary("$2,000 - $2,500");
+        emily.setCertificates("CELTA, IELTS, TESOL");
         emily.setPhone("+84 988 111 222");
         emily.setBio("Updated teacher biography.");
         assertTrue(store.saveTeacherProfile("teacher", emily));
@@ -94,7 +99,7 @@ class PortalStoreTest {
                 "teacher",
                 emily.getId(),
                 "cert_scan.png",
-                "Certificate",
+                "Certificates",
                 samplePng.toString()
         );
         assertNotNull(addedDoc);
@@ -139,14 +144,67 @@ class PortalStoreTest {
     }
 
     @Test
-    void fullStatePersistsAcrossPortalStoreReload() throws Exception {
+    void distinctTeacherAvatarsRealDocumentsChecklistAndStatusCatalogWork() throws Exception {
+        PortalStore store = new PortalStore(tempDir.resolve("catalog"));
+
+        TeacherProfile emily = store.teacher(1L);
+        TeacherProfile daniel = store.teacher(2L);
+        TeacherProfile sarah = store.teacher(3L);
+
+        assertNotNull(emily);
+        assertNotNull(daniel);
+        assertNotNull(sarah);
+
+        // Feedback I.6 & II.8: Each teacher has their own distinct avatar and documents (never hardcoded Emily Martin)
+        assertNotEquals(emily.getAvatarUrl(), daniel.getAvatarUrl());
+        assertNotEquals(emily.getAvatarUrl(), sarah.getAvatarUrl());
+        assertNotEquals(daniel.getAvatarUrl(), sarah.getAvatarUrl());
+
+        List<TeacherDocument> danielDocs = store.documents(2L);
+        assertFalse(danielDocs.isEmpty());
+        assertTrue(danielDocs.stream().allMatch(d -> d.fileName().contains("Daniel_Walker")),
+                "Daniel Walker's documents must belong to Daniel Walker, not Emily Martin");
+        for (TeacherDocument doc : danielDocs) {
+            Path resolved = store.resolveDocumentLocalFile(doc);
+            assertNotNull(resolved, "Sample document must resolve to a real local file: " + doc.fileName());
+            assertTrue(Files.isRegularFile(resolved));
+        }
+
+        // Feedback II.7 & II.9: Staff can mark UPDATE_REQUIRED / NEED_UPDATE, qCV, qEP and persist 5-item checklist + feedback
+        boolean[] flags = new boolean[]{true, true, false, true, false};
+        assertTrue(store.saveReviewState("staff", 3L, "NEED_UPDATE", "Please upload high-res TESOL scan.", flags, "Updated Sarah bio"));
+        assertEquals("UPDATE_REQUIRED", store.teacher(3L).getStatus());
+        assertEquals("Update Required", CatalogData.formatShortStatusCode(store.teacher(3L).getStatus()));
+        assertEquals("Please upload high-res TESOL scan.", store.teacher(3L).getStaffFeedback());
+        assertArrayEquals(flags, store.teacher(3L).getChecklistFlags());
+
+        assertTrue(store.status("staff", 3L, "qCV"));
+        assertEquals("PENDING", store.teacher(3L).getStatus());
+        assertEquals("qCV", CatalogData.formatShortStatusCode(store.teacher(3L).getStatus()));
+
+        assertTrue(store.status("staff", 3L, "qEP"));
+        assertEquals("READY", store.teacher(3L).getStatus());
+        assertEquals("qEP", CatalogData.formatShortStatusCode(store.teacher(3L).getStatus()));
+
+        // CatalogData filters: Nationality A-Z + Other, Experience 4 tiers, Multi-certificate, Salary, Major/Degree
+        assertTrue(CatalogData.WORLD_COUNTRIES_AZ.size() > 190);
+        assertEquals("Other", CatalogData.WORLD_COUNTRIES_AZ.get(CatalogData.WORLD_COUNTRIES_AZ.size() - 1));
+        assertEquals(List.of("Under 1 year", "1–2 years", "3–5 years", "Over 5 years"), CatalogData.EXPERIENCE_OPTIONS);
+        assertTrue(CatalogData.matchesCertificatesFilter("CELTA, IELTS, TESOL", Set.of("CELTA", "IELTS")));
+        assertFalse(CatalogData.matchesCertificatesFilter("TEFL", Set.of("CELTA", "DELTA")));
+        assertTrue(CatalogData.matchesSalaryFilter("$2,100", "$2,000 - $2,500"));
+        assertTrue(CatalogData.matchesMajorOrDegreeFilter("Master's Degree", "Applied Linguistics", "Applied Linguistics"));
+    }
+
+    @Test
+    void fullStatePersistsAcrossPortalStoreReloadAndCloudSync() throws Exception {
         Path dataDir = tempDir.resolve("persistence");
         PortalStore store1 = new PortalStore(dataDir);
 
         // 1. Add user
         assertTrue(store1.saveOrUpdateUser("admin", "partner2", "Global Academy", "PARTNER", "global123", true));
-        // 2. Grant partner2 access to teacher 3 and set teacher 3 READY
-        assertTrue(store1.status("staff", 3L, "READY"));
+        // 2. Grant partner2 access to teacher 3 and set teacher 3 READY (qEP)
+        assertTrue(store1.status("staff", 3L, "qEP"));
         assertTrue(store1.grant("staff", "partner2", 3L));
         // 3. Save partner evaluation
         assertTrue(store1.savePartnerEvaluation("partner2", 3L, "Shortlisted", "Great IELTS background"));
@@ -177,5 +235,36 @@ class PortalStoreTest {
 
         List<TeacherDocument> docs = store2.documents(1L);
         assertTrue(docs.stream().anyMatch(d -> "Portfolio.pdf".equals(d.fileName()) && "CV".equals(d.type())));
+    }
+
+    @Test
+    void multiDeviceCloudSyncPropagatesAccountsAndProfilesAcrossStores() {
+        PortalStore deviceA = new PortalStore(tempDir.resolve("deviceA"), new com.example.tmver36.service.CloudSyncService());
+        PortalStore deviceB = new PortalStore(tempDir.resolve("deviceB"), new com.example.tmver36.service.CloudSyncService());
+
+        if (!deviceA.getCloudSync().isEnabled()) {
+            return;
+        }
+
+        String uniqueUser = "sync_teacher_" + (System.currentTimeMillis() % 100000);
+        try {
+            assertTrue(deviceA.saveOrUpdateUser("admin", uniqueUser, "Cloud Synced Teacher", "TEACHER", "cloudPass123", true));
+            TeacherProfile pA = deviceA.teacherForUser(uniqueUser);
+            assertNotNull(pA);
+            pA.setExpectedSalary("$2,500 - $3,000");
+            pA.setMajor("TESOL & Applied Linguistics");
+            assertTrue(deviceA.saveTeacherProfile(uniqueUser, pA));
+
+            // Device B pulls from shared Supabase backend on authenticate / syncNow
+            assertNotNull(deviceB.authenticate(uniqueUser, "cloudPass123"),
+                    "Account created on Device A must be immediately usable on Device B via shared database");
+            TeacherProfile pB = deviceB.teacherForUser(uniqueUser);
+            assertNotNull(pB);
+            assertEquals("$2,500 - $3,000", pB.getExpectedSalary());
+            assertEquals("TESOL & Applied Linguistics", pB.getMajor());
+        } finally {
+            deviceA.deleteUser("admin", uniqueUser);
+            deviceA.resetToSeedData();
+        }
     }
 }

@@ -53,7 +53,7 @@
         </HBox>
       </top>
       <center>
-        <ScrollPane hbarPolicy="AS_NEEDED">
+        <ScrollPane hbarPolicy="NEVER" fitToWidth="true">
           <content>
             <VBox spacing="22" styleClass="content">
               <HBox alignment="CENTER_LEFT" spacing="12">

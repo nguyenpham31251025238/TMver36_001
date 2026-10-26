@@ -13,13 +13,12 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
 
-import java.awt.Desktop;
 import java.io.File;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -41,6 +40,7 @@ public class TeacherDocumentsController {
     @FXML private Button chooseFileButton;
     @FXML private TextField documentUrl;
     @FXML private Button addDocumentButton;
+    @FXML private Label uploadStatusLabel;
     @FXML private Button viewCvButton;
     @FXML private Button deleteCvButton;
     @FXML private Button viewCertificateButton;
@@ -68,7 +68,7 @@ public class TeacherDocumentsController {
         if (addDocumentButton != null) addDocumentButton.setOnAction(e -> addDocument());
         if (viewCvButton != null) viewCvButton.setOnAction(e -> openByType("CV"));
         if (deleteCvButton != null) deleteCvButton.setOnAction(e -> deleteByType("CV"));
-        if (viewCertificateButton != null) viewCertificateButton.setOnAction(e -> openByType("Certificates"));
+        if (viewCertificateButton != null) viewCertificateButton.setOnAction(e -> openByType("Certificate"));
         if (viewIntroButton != null) viewIntroButton.setOnAction(e -> openByType("Intro video"));
         if (viewDemoButton != null) viewDemoButton.setOnAction(e -> openByType("Teaching video"));
 
@@ -80,8 +80,15 @@ public class TeacherDocumentsController {
         if (root == null) return;
         TeacherProfile profile = STORE.teacher(currentTeacherId());
         if (profile == null) return;
+        String initials = ProfileCardBuilder.initialsOf(profile.getName());
         for (Label label : FxNodes.findAllByStyleClass(root, "sidebar-name", Label.class)) {
             label.setText(profile.getName());
+        }
+        for (Label avatar : FxNodes.findAllByStyleClass(root, "avatar", Label.class)) {
+            avatar.setText(initials);
+        }
+        for (Label avatarSmall : FxNodes.findAllByStyleClass(root, "avatar-small", Label.class)) {
+            avatarSmall.setText(initials);
         }
     }
 
@@ -98,7 +105,7 @@ public class TeacherDocumentsController {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Choose a document");
         chooser.getExtensionFilters().addAll(
-                new FileChooser.ExtensionFilter("Documents & Media", "*.pdf", "*.doc", "*.docx", "*.jpg", "*.jpeg", "*.png", "*.mp4", "*.mov", "*.webm"),
+                new FileChooser.ExtensionFilter("Documents & Media", "*.pdf", "*.doc", "*.docx", "*.jpg", "*.jpeg", "*.png", "*.mp4", "*.mov", "*.webm", "*.html"),
                 new FileChooser.ExtensionFilter("All files", "*.*")
         );
         chosenFile = chooser.showOpenDialog(window);
@@ -108,6 +115,9 @@ public class TeacherDocumentsController {
             }
             if (documentUrl != null) {
                 documentUrl.setText(chosenFile.getAbsolutePath());
+            }
+            if (uploadStatusLabel != null) {
+                uploadStatusLabel.setText("Selected file: " + chosenFile.getName() + " (" + (chosenFile.length() / 1024 + 1) + " KB). Click 'Save & Upload Document' to attach.");
             }
         }
     }
@@ -142,15 +152,15 @@ public class TeacherDocumentsController {
         if (documentName != null) documentName.clear();
         if (documentUrl != null) documentUrl.clear();
         chosenFile = null;
+        if (uploadStatusLabel != null) {
+            uploadStatusLabel.setText("Uploaded '" + saved.fileName() + "' (" + saved.type() + ") and synced to profile.");
+        }
         renderDocuments();
         showInfo("Document saved", "Saved '" + saved.fileName() + "' (" + saved.type() + ").");
     }
 
     private void deleteByType(String type) {
-        List<TeacherDocument> docs = STORE.documents(currentTeacherId());
-        TeacherDocument target = docs.stream()
-                .filter(d -> d.type() != null && d.type().toLowerCase(Locale.ROOT).contains(type.toLowerCase(Locale.ROOT)))
-                .findFirst().orElse(null);
+        TeacherDocument target = ProfileCardBuilder.findDocumentByCategory(STORE, currentTeacherId(), type);
         if (target == null) {
             showError("No document", "There is no " + type + " document to delete.");
             return;
@@ -160,10 +170,7 @@ public class TeacherDocumentsController {
     }
 
     private void openByType(String type) {
-        List<TeacherDocument> docs = STORE.documents(currentTeacherId());
-        TeacherDocument doc = docs.stream()
-                .filter(d -> d.type() != null && d.type().toLowerCase(Locale.ROOT).contains(type.toLowerCase(Locale.ROOT)))
-                .findFirst().orElse(null);
+        TeacherDocument doc = ProfileCardBuilder.findDocumentByCategory(STORE, currentTeacherId(), type);
         if (doc == null) {
             showError("Document unavailable", "No file or URL is available for " + type + ".");
             return;
@@ -181,7 +188,7 @@ public class TeacherDocumentsController {
 
         List<TeacherDocument> docs = STORE.documents(currentTeacherId());
         if (docs.isEmpty()) {
-            HBox empty = new HBox(new Label("No documents have been added."));
+            HBox empty = new HBox(new Label("No documents have been uploaded for your profile yet."));
             empty.getStyleClass().add("table-row");
             documentsTable.getChildren().add(empty);
             return;
@@ -190,53 +197,41 @@ public class TeacherDocumentsController {
             HBox row = new HBox(0);
             row.setAlignment(Pos.CENTER_LEFT);
             row.getStyleClass().add("table-row");
-            row.getChildren().add(cell(doc.fileName(), 350));
-            row.getChildren().add(cell(doc.type(), 200));
-            row.getChildren().add(cell(doc.updatedAt(), 160));
+
+            VBox nameCell = cell(doc.fileName(), 280);
+            HBox.setHgrow(nameCell, Priority.ALWAYS);
+            row.getChildren().add(nameCell);
+            row.getChildren().add(cell(doc.type(), 160));
+            row.getChildren().add(cell(doc.updatedAt(), 130));
+
             HBox actionCell = new HBox(8);
             actionCell.setAlignment(Pos.CENTER_LEFT);
-            actionCell.setMinWidth(270);
-            actionCell.setPrefWidth(270);
-            actionCell.setMaxWidth(270);
+            actionCell.setMinWidth(240);
+            actionCell.setPrefWidth(260);
 
-            Button view = new Button("View");
-            view.getStyleClass().add("secondary");
+            Button view = new Button(doc.type().toLowerCase(Locale.ROOT).contains("video") ? "Watch" : "View");
+            view.getStyleClass().addAll("button-sm", "secondary");
             view.setOnAction(e -> open(doc));
 
+            Button download = new Button("Download");
+            download.getStyleClass().addAll("button-sm", "secondary");
+            download.setOnAction(e -> ProfileCardBuilder.downloadDocumentToDisk(STORE, currentActor(), doc, download));
+
             Button delete = new Button("Delete");
-            delete.getStyleClass().add("danger");
+            delete.getStyleClass().addAll("button-sm", "danger");
             delete.setOnAction(e -> {
                 STORE.removeDocument(currentActor(), currentTeacherId(), doc.id());
                 renderDocuments();
             });
-            actionCell.getChildren().addAll(view, delete);
+            actionCell.getChildren().addAll(view, download, delete);
             row.getChildren().add(actionCell);
             documentsTable.getChildren().add(row);
         }
     }
 
     private void open(TeacherDocument document) {
-        String loc = document == null || document.location() == null ? "" : document.location().trim();
-        if (loc.isBlank()) {
+        if (document == null || !STORE.openDocument(currentActor(), document)) {
             showError("Document unavailable", "No URL or local file is stored for this document.");
-            return;
-        }
-        try {
-            if (Desktop.isDesktopSupported()) {
-                if (loc.startsWith("http://") || loc.startsWith("https://")) {
-                    Desktop.getDesktop().browse(URI.create(loc));
-                } else if (loc.startsWith("file:")) {
-                    Desktop.getDesktop().open(Path.of(URI.create(loc)).toFile());
-                } else {
-                    File file = new File(loc);
-                    if (file.exists()) {
-                        Desktop.getDesktop().open(file);
-                    }
-                }
-            }
-            STORE.log(currentActor(), "Opened document " + document.fileName());
-        } catch (Exception ex) {
-            showError("Could not open document", ex.getMessage());
         }
     }
 
@@ -244,18 +239,16 @@ public class TeacherDocumentsController {
         Label label = new Label(text == null ? "" : text);
         label.getStyleClass().add("table-text");
         label.setWrapText(true);
-        label.setMaxWidth(width - 16);
         VBox box = new VBox(label);
         box.setAlignment(Pos.CENTER_LEFT);
-        box.setMinWidth(width);
+        box.setMinWidth(width - 40);
         box.setPrefWidth(width);
-        box.setMaxWidth(width);
         return box;
     }
 
     private long currentTeacherId() {
-        long id = STORE.teacherIdForUser(currentActor());
-        return id > 0 ? id : 1L;
+        TeacherProfile linked = STORE.teacherForUser(currentActor());
+        return linked != null ? linked.getId() : 1L;
     }
 
     private String currentActor() {

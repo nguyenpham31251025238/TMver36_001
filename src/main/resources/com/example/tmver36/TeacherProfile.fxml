@@ -5,15 +5,17 @@
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.MenuButton?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
-<BorderPane prefHeight="900" prefWidth="1360" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.TeacherProfileController">
+<BorderPane prefHeight="860" prefWidth="1280" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.TeacherProfileController">
   <left>
     <VBox minWidth="228" prefWidth="228" spacing="14" styleClass="sidebar">
       <HBox alignment="CENTER_LEFT" spacing="12">
@@ -29,11 +31,10 @@
       <Button fx:id="nav_TeacherSchedule" maxWidth="Infinity" styleClass="nav" text="Availability &amp; Interviews" />
       <Button fx:id="nav_TeacherHistory" maxWidth="Infinity" styleClass="nav" text="Connection Status" />
       <Region VBox.vgrow="ALWAYS" />
-      <VBox spacing="6" />
       <HBox alignment="CENTER_LEFT" spacing="12">
-        <Label alignment="CENTER" minHeight="50" minWidth="50" styleClass="avatar" text="EM" />
+        <Label fx:id="sidebarAvatarInitials" alignment="CENTER" minHeight="50" minWidth="50" styleClass="avatar" text="EM" />
         <VBox spacing="4">
-          <Label styleClass="sidebar-name" text="Emily Martin" />
+          <Label fx:id="sidebarTeacherName" styleClass="sidebar-name" text="Emily Martin" />
           <Label styleClass="nav-foot" text="Teacher" />
         </VBox>
       </HBox>
@@ -46,76 +47,93 @@
         <HBox alignment="CENTER_LEFT" spacing="12" styleClass="topbar">
           <Label styleClass="breadcrumb" text="Teacher / My Profile" />
           <Region HBox.hgrow="ALWAYS" />
-          <Label styleClass="badge,badge-gray" text="DEMO" />
-          <Label styleClass="muted" text="14/10/2026" />
-          <Label alignment="CENTER" minHeight="36" minWidth="36" styleClass="avatar-small" text="EM" />
+          <Label styleClass="badge,badge-green" text="LIVE SYNC" />
+          <Label styleClass="muted" text="26/10/2026" />
+          <Label fx:id="topAvatarInitials" alignment="CENTER" minHeight="36" minWidth="36" styleClass="avatar-small" text="EM" />
         </HBox>
       </top>
       <center>
-        <ScrollPane fitToWidth="true" hbarPolicy="NEVER">
+        <ScrollPane fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED">
           <content>
-            <VBox spacing="22" styleClass="content">
+            <VBox spacing="20" styleClass="content">
               <HBox alignment="CENTER_LEFT" spacing="12">
-                <VBox spacing="7">
+                <VBox spacing="6">
                   <Label styleClass="page-title" text="My Profile" />
-                  <Label styleClass="muted" text="Information for Matching to introduce you to suitable partners." wrapText="true" />
+                  <Label styleClass="muted" text="Complete your qualification, degree/major, expected salary, and avatar so Matching Staff can verify your profile (qEP)." wrapText="true" />
                 </VBox>
                 <Region HBox.hgrow="ALWAYS" />
               </HBox>
-              <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
-                <HBox alignment="CENTER_LEFT" spacing="12">
-                  <Label alignment="CENTER" minHeight="50" minWidth="50" styleClass="avatar" text="EM" />
-                  <VBox spacing="5">
-                    <Label styleClass="section-title" text="Emily Martin" />
-                    <Label styleClass="muted" text="English Teacher · United Kingdom" />
+
+              <!-- Header Card with Avatar Upload & Status Badge -->
+              <VBox spacing="12" styleClass="card" HBox.hgrow="ALWAYS">
+                <HBox alignment="CENTER_LEFT" spacing="14">
+                  <StackPane fx:id="avatarContainer" minHeight="60" minWidth="60" prefHeight="60" prefWidth="60" />
+                  <VBox spacing="4" HBox.hgrow="ALWAYS">
+                    <Label fx:id="headerNameLabel" styleClass="section-title" text="Emily Martin" />
+                    <Label fx:id="headerSubtitleLabel" styleClass="muted" text="English Teacher · United Kingdom" wrapText="true" />
                   </VBox>
-                  <Region HBox.hgrow="ALWAYS" />
-                  <Label styleClass="badge,badge-amber" text="Pending review" />
+                  <Button fx:id="uploadAvatarButton" styleClass="button-sm,secondary" text="Upload Avatar" />
+                  <Label fx:id="statusBadgeLabel" styleClass="badge,badge-amber" text="qCV (Pending)" />
                 </HBox>
-                <Label maxWidth="Infinity" styleClass="note" text="Profile submitted on 14/10/2026. Update information when Matching requests." wrapText="true" />
+                <Label fx:id="profileNoteLabel" maxWidth="Infinity" styleClass="note" text="Profile submitted. Update your information anytime when Matching Staff requests changes." wrapText="true" />
+                <Label fx:id="staffFeedbackBanner" managed="false" maxWidth="Infinity" styleClass="feedback-banner" text="" visible="false" wrapText="true" />
               </VBox>
+
+              <!-- Personal & Academic Qualification Form -->
               <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
-                <Label styleClass="section-title" text="Personal Information" />
+                <Label styleClass="section-title" text="Personal &amp; Qualification Details" />
+
                 <HBox alignment="CENTER_LEFT" spacing="12">
-                  <VBox spacing="7" HBox.hgrow="ALWAYS">
-                    <Label styleClass="field-label" text="Full name" />
-                    <TextField fx:id="fullNameField" prefWidth="280" promptText="" text="Emily Martin" />
+                  <VBox spacing="6" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Full name *" />
+                    <TextField fx:id="fullNameField" promptText="Full name" text="Emily Martin" />
                   </VBox>
-                  <VBox spacing="7" HBox.hgrow="ALWAYS">
-                    <Label styleClass="field-label" text="Email" />
-                    <TextField fx:id="emailField" prefWidth="280" promptText="" text="emily@example.com" />
+                  <VBox spacing="6" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Email *" />
+                    <TextField fx:id="emailField" promptText="name@example.com" text="emily@example.com" />
                   </VBox>
-                </HBox>
-                <HBox alignment="CENTER_LEFT" spacing="12">
-                  <VBox spacing="7" HBox.hgrow="ALWAYS">
-                    <Label styleClass="field-label" text="Nationality" />
-                    <ComboBox fx:id="nationalityCombo" maxWidth="Infinity" prefWidth="230">
-                      <items>
-                        <FXCollections fx:factory="observableArrayList">
-                          <String fx:value="United Kingdom" />
-                          <String fx:value="Canada" />
-                          <String fx:value="Australia" />
-                          <String fx:value="Other" />
-                        </FXCollections>
-                      </items>
-                      <value>
-                        <String fx:value="United Kingdom" />
-                      </value>
-                    </ComboBox>
-                  </VBox>
-                  <VBox spacing="7" HBox.hgrow="ALWAYS">
+                  <VBox spacing="6" HBox.hgrow="ALWAYS">
                     <Label styleClass="field-label" text="Phone number" />
-                    <TextField fx:id="phoneField" prefWidth="280" promptText="" text="+44 7700 900123" />
+                    <TextField fx:id="phoneField" promptText="+44 7700 900123" text="+44 7700 900123" />
                   </VBox>
                 </HBox>
+
                 <HBox alignment="CENTER_LEFT" spacing="12">
-                  <VBox spacing="7" HBox.hgrow="ALWAYS">
-                    <Label styleClass="field-label" text="Teaching experience" />
-                    <TextField fx:id="experienceCombo" prefWidth="280" promptText="" text="4 years" />
+                  <VBox spacing="6" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Nationality (A–Z searchable + Other)" />
+                    <ComboBox fx:id="nationalityCombo" editable="true" maxWidth="Infinity" promptText="Select or search country..." />
                   </VBox>
-                  <VBox spacing="7" HBox.hgrow="ALWAYS">
+                  <VBox spacing="6" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Degree (Bachelor / Master)" />
+                    <ComboBox fx:id="degreeCombo" maxWidth="Infinity" />
+                  </VBox>
+                  <VBox spacing="6" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Major / Field of Study" />
+                    <ComboBox fx:id="majorCombo" editable="true" maxWidth="Infinity" />
+                  </VBox>
+                </HBox>
+
+                <HBox alignment="CENTER_LEFT" spacing="12">
+                  <VBox spacing="6" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Teaching experience" />
+                    <ComboBox fx:id="experienceTierCombo" maxWidth="Infinity" />
+                    <!-- Hidden legacy TextField for backward-compatible test injection -->
+                    <TextField fx:id="experienceCombo" managed="false" visible="false" />
+                  </VBox>
+                  <VBox spacing="6" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Certificates (Multi-select: CELTA, TEFL, TESOL, IELTS...)" />
+                    <MenuButton fx:id="certificatesMenuButton" maxWidth="Infinity" text="Select certificates" />
+                  </VBox>
+                  <VBox spacing="6" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Expected Salary (USD / month)" />
+                    <ComboBox fx:id="expectedSalaryCombo" editable="true" maxWidth="Infinity" />
+                  </VBox>
+                </HBox>
+
+                <HBox alignment="CENTER_LEFT" spacing="12">
+                  <VBox spacing="6" HBox.hgrow="ALWAYS">
                     <Label styleClass="field-label" text="Target age group" />
-                    <ComboBox fx:id="aboutArea" maxWidth="Infinity" prefWidth="230">
+                    <ComboBox fx:id="aboutArea" maxWidth="Infinity">
                       <items>
                         <FXCollections fx:factory="observableArrayList">
                           <String fx:value="Kindergarten" />
@@ -126,29 +144,29 @@
                         </FXCollections>
                       </items>
                       <value>
-                        <String fx:value="Preschool" />
+                        <String fx:value="Elementary School" />
                       </value>
                     </ComboBox>
                   </VBox>
-                </HBox>
-                <HBox alignment="CENTER_LEFT" spacing="12">
-                  <VBox spacing="7" HBox.hgrow="ALWAYS">
-                    <Label styleClass="field-label" text="Preferred location" />
-                    <TextField fx:id="locationCombo" prefWidth="280" promptText="" text="Hanoi, Danang" />
+                  <VBox spacing="6" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Preferred city / location" />
+                    <TextField fx:id="locationCombo" promptText="Hanoi, Danang, HCM City" text="Hanoi" />
                   </VBox>
-                  <VBox spacing="7" HBox.hgrow="ALWAYS">
-                    <Label styleClass="field-label" text="Available start date" />
-                    <TextField fx:id="dateSelect" prefWidth="280" promptText="" text="01/12/2026" />
+                  <VBox spacing="6" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Available start date (dd/MM/yyyy)" />
+                    <TextField fx:id="dateSelect" promptText="01/12/2026" text="01/12/2026" />
                   </VBox>
                 </HBox>
-                <VBox spacing="7">
-                  <Label styleClass="field-label" text="About me" />
-                  <TextArea fx:id="bioArea" prefHeight="92" promptText="" text="Experienced primary English teacher with a CELTA certificate. I enjoy building engaging lessons through games and collaborative activities." wrapText="true" />
+
+                <VBox spacing="6">
+                  <Label styleClass="field-label" text="About me &amp; Teaching philosophy" />
+                  <TextArea fx:id="bioArea" prefHeight="92" promptText="Describe your teaching style, strengths, and classroom experience..." text="" wrapText="true" />
                 </VBox>
+
                 <HBox alignment="CENTER_LEFT" spacing="12">
                   <Region HBox.hgrow="ALWAYS" />
                   <Button fx:id="saveDraftButton" styleClass="secondary" text="Save draft" />
-                  <Button fx:id="submitProfileButton" styleClass="primary" text="Submit profile for review" />
+                  <Button fx:id="submitProfileButton" styleClass="primary" text="Submit profile for review (qCV)" />
                 </HBox>
               </VBox>
             </VBox>

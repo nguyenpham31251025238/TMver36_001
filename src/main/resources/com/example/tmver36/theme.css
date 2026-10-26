@@ -86,3 +86,75 @@
     -fx-background-position: center;
     -fx-background-radius: 25;
 }
+/* === Shopee-inspired Teacher Profile Cards & Responsive Design System === */
+.profile-card-grid {
+    -fx-padding: 6 0 6 0;
+}
+.teacher-card {
+    -fx-background-color: white;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: #dce6ef;
+    -fx-border-width: 1;
+    -fx-padding: 16;
+    -fx-effect: dropshadow(gaussian, rgba(16, 42, 67, 0.06), 12, 0.1, 0, 3);
+}
+.teacher-card:hover {
+    -fx-border-color: #037EF3;
+    -fx-effect: dropshadow(gaussian, rgba(3, 126, 243, 0.14), 16, 0.15, 0, 4);
+}
+.teacher-card-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #102a43;
+}
+.teacher-card-subtitle {
+    -fx-font-size: 12px;
+    -fx-text-fill: #486581;
+}
+.salary-tag {
+    -fx-background-color: #fff4ec;
+    -fx-text-fill: #d9480f;
+    -fx-border-color: #ffd8bd;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 4 9;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+.cert-chip {
+    -fx-background-color: #eef5ff;
+    -fx-text-fill: #1d4ed8;
+    -fx-border-color: #cfe0fc;
+    -fx-border-radius: 5;
+    -fx-background-radius: 5;
+    -fx-padding: 3 8;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+.meta-chip {
+    -fx-background-color: #f4f7fa;
+    -fx-text-fill: #334e68;
+    -fx-background-radius: 5;
+    -fx-padding: 3 8;
+    -fx-font-size: 11px;
+}
+.feedback-banner {
+    -fx-background-color: #fff8eb;
+    -fx-border-color: #f6ad55;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 12 16;
+}
+.button-sm {
+    -fx-padding: 7 11;
+    -fx-font-size: 11px;
+}
+.menu-button {
+    -fx-background-color: #fafcfd;
+    -fx-border-color: #dce4e9;
+    -fx-border-radius: 7;
+    -fx-background-radius: 7;
+    -fx-padding: 5 8;
+    -fx-font-size: 12px;
+}
