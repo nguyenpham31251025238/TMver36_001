@@ -63,3 +63,34 @@
 | Đóng gói & ký số `jpackage` (`.msi`, `.exe`, `portable.zip`) | Windows 11 (JDK 21.0.12 + WiX 3.11.2) | **PASS** |
 | Cài đặt / Khởi chạy / Lưu dữ liệu / Gỡ cài đặt thực tế | Windows 11 (`msiexec` & Portable) | **PASS** |
 | Phát hành GitHub Release `v1.0.0` kèm bộ cài đặt | GitHub Releases | **PASS** |
+
+---
+
+## 5. Nâng Cấp Toàn Diện Theo 19 Mục Feedback (`feedback app.pdf`) & Đồng Bộ Đa Thiết Bị (2026-10-26 23:20 UTC+7)
+
+### 5.1. Checklist 19 Mục Feedback Trong `feedback app.pdf`
+
+| Mã mục | Trang PDF | Nội dung Feedback | Trạng thái | File / Component xử lý & Bằng chứng |
+| :--- | :---: | :--- | :---: | :--- |
+| **I.1** | Tr. 1 | Số liệu trên Matching Staff (`24`, `06`, `03`) đang hardcode, không khớp hồ sơ thực tế | **Đã sửa** | `StaffDashboard.fxml`, `StaffDashboardController.java` (`updateMetrics()` tính trực tiếp từ `STORE.teachers()` và `STORE.interviews()`) |
+| **I.2** | Tr. 1 | Bộ lọc `Share with partner` thừa trên thanh filter Matching Staff | **Đã sửa** | Đã gỡ khỏi hàng filter trong `StaffDashboard.fxml`, giữ thao tác cấp quyền trực tiếp trên từng thẻ hồ sơ |
+| **I.3 / II.8** | Tr. 1, 5 | Các tài liệu CV, chứng chỉ, video dùng link mẫu `example.com` hoặc gắn cứng tên file của Emily Martin | **Đã sửa** | `src/main/resources/com/example/tmver36/samples/` (12 file PDF/HTML thật riêng biệt cho từng giáo viên), `PortalStore.java`, `StaffReviewController.java`, `PartnerProfileController.java`, `TeacherDocumentsController.java` |
+| **I.4** | Tr. 1 | Chức năng `Remember me` trên màn hình Login chưa hoạt động | **Đã sửa** | `Login.fxml` (`fx:id="rememberMeCheck"`), `LoginController.java` (lưu token băm SHA-256 + thời hạn 14 ngày vào `remember-session.properties`, không lưu mật khẩu thuần) |
+| **I.5** | Tr. 1–2 | Tạo tài khoản/cập nhật dữ liệu ở thiết bị này nhưng thiết bị khác không đăng nhập/đồng bộ được | **Đã sửa** | `CloudSyncService.java` + `PortalStore.java` kết nối Supabase PostgreSQL (`public.tm_portal_state` & `public.tm_shared_files`), tự động đồng bộ hai chiều khi khởi động, đăng nhập, lưu dữ liệu hoặc bấm `Sync Cloud` |
+| **I.6** | Tr. 2 | Mọi giáo viên đều dùng chung ảnh đại diện của Emily Martin (`EM.jpg`) | **Đã sửa** | Tạo 3 ảnh đại diện riêng (`emily_avatar.png`, `daniel_avatar.png`, `sarah_avatar.png`) + hỗ trợ tải ảnh đại diện mới (`PortalStore.updateTeacherAvatar()`) đồng bộ lên Cloud |
+| **I.7** | Tr. 2 | File giáo viên tải lên không hiển thị đúng cho Staff/Partner xem và tải xuống | **Đã sửa** | `TeacherDocumentsController`, `StaffReviewController`, `PartnerProfileController`, `ProfileCardBuilder` đọc động từ `STORE.documents(teacherId)` và `CloudSyncService.downloadSharedFile()` |
+| **II.1** | Tr. 2–3 | Giao diện bị tràn ngang (horizontal scrollbar) trên màn hình chuẩn | **Đã sửa** | Toàn bộ 13 màn hình FXML đặt `prefWidth="1280"`, `ScrollPane fitToWidth="true" hbarPolicy="NEVER"`, thanh filter tự xuống dòng (`FlowPane`) |
+| **II.2** | Tr. 3 | Quốc tịch chỉ có 3 lựa chọn (`US`, `UK`, `Canada`) | **Đã sửa** | `CatalogData.WORLD_COUNTRIES_AZ` gồm 195+ quốc gia xếp theo A–Z, hỗ trợ gõ tìm kiếm trực tiếp trên `ComboBox` kèm lựa chọn `Other` |
+| **II.3** | Tr. 3 | Kinh nghiệm (`Experience`) không đồng bộ giữa Staff và Partner | **Đã sửa** | Chuẩn hóa 4 mức trên toàn hệ thống (`CatalogData.EXPERIENCE_OPTIONS`: `Under 1 year`, `1–2 years`, `3–5 years`, `Over 5 years`) |
+| **II.4** | Tr. 3–4 | Danh sách giáo viên dạng bảng chữ đơn điệu, cần thiết kế dạng thẻ hồ sơ chuyên nghiệp (tham khảo Shopee) | **Đã sửa** | `ProfileCardBuilder.java`, `StaffDashboard.fxml`, `PartnerDashboard.fxml`, `theme.css` hiển thị lưới thẻ `FlowPane` với avatar, badge `qEP`/`qCV`, quốc tịch, bằng cấp, chuyên ngành, chip chứng chỉ, lương kỳ vọng và nút thao tác nhanh |
+| **II.5** | Tr. 4 | Chứng chỉ (`Certificate`) chỉ chọn được 1 giá trị và thiếu `IELTS` | **Đã sửa** | Hỗ trợ chọn nhiều chứng chỉ (`Multi-select MenuButton` / `CheckBox` gồm `CELTA`, `TEFL`, `TESOL`, `IELTS`, `TOEFL`, `DELTA`, `Cambridge TKT`, `PGCE`) |
+| **II.6** | Tr. 4 | Thay bộ lọc `Location` bằng `Major / Degree` (`Bachelor`, `Master`...) | **Đã sửa** | Thêm `degree` và `major` vào `TeacherProfile`, `TeacherProfile.fxml`, và thay bộ lọc `Location` trên `StaffDashboard` & `PartnerDashboard` bằng `Major / Degree` |
+| **II.7** | Tr. 5 | Staff bấm `Request update` báo lỗi không có quyền và không gửi được feedback cho giáo viên | **Đã sửa** | `StaffReviewController` gọi `STORE.saveReviewState(..., "UPDATE_REQUIRED", feedback, checklistFlags, ...)` và hiển thị banner phản hồi trên `TeacherProfile.fxml` |
+| **II.9** | Tr. 5–6 | `Review checklist` bị hardcode trạng thái tick, thoát ra vào lại bị mất | **Đã sửa** | Lưu bền vững chuỗi `reviewChecklist` (`boolean[5]`) cho từng giáo viên trong `TeacherProfile` & `PortalStore` |
+| **III.1** | Tr. 6 | Đổi 2 lựa chọn trạng thái đầu trong bộ lọc Status thành `qCV` và `qEP` | **Đã sửa** | `CatalogData.STAFF_STATUS_FILTER_OPTIONS` (`All`, `qCV`, `qEP`, `Update Required`) ánh xạ tương thích ngược với `PENDING` (`qCV`) và `READY` (`qEP`) |
+| **III.2** | Tr. 6–7 | Thêm mức lương kỳ vọng (`Expected Salary`) vào hồ sơ giáo viên và hiển thị/lọc bên Partner & Staff | **Đã sửa** | Thêm trường `expectedSalary` vào `TeacherProfile`, form `TeacherProfile.fxml`, thẻ hồ sơ `ProfileCardBuilder`, và bộ lọc lương trên `StaffDashboard` & `PartnerDashboard` |
+| **III.3** | Tr. 7 | Bên Partner không bấm mở hoặc sao chép được `Meeting link` trong bảng phỏng vấn | **Đã sửa** | `PartnerInterviewController.renderRequests()` hiển thị `Hyperlink` có thể bấm mở trình duyệt + nút `Join Meet` + nút `Copy Link` trên từng dòng và giữ nguyên nút `openPartnerMeetButton` |
+
+### 5.2. Kết Quả Kiểm Thử Hồi Quy & Đa Thiết Bị Mới Nhất (11/11 Tests PASS)
+- `FxmlAndNavigationTest` (**5/5 PASS**): Kiểm tra nạp 14 FXML không lỗi, kiểm tra `ScrollPane` không tràn ngang (`fitToWidth=true`, `hbarPolicy=NEVER`), kiểm tra `Remember me`, kiểm tra KPI động & bộ lọc `qCV`/`qEP` + lưới thẻ `FlowPane`, kiểm tra `StaffReview` hiển thị đúng tài liệu riêng của từng giáo viên + lưu `Review checklist` + gửi `Update Required`, kiểm tra `PartnerInterview` hiển thị `Hyperlink` phòng họp.
+- `PortalStoreTest` (**6/6 PASS**): Kiểm tra xác thực PBKDF2, quản lý tài khoản, luồng đặt lịch & tự sinh phòng họp Jitsi, tách biệt avatar/tài liệu của 3 giáo viên, bộ lọc `CatalogData`, lưu trữ bền vững và **đồng bộ thực tế giữa 2 thiết bị (`deviceA` và `deviceB`) qua Supabase Cloud**.
