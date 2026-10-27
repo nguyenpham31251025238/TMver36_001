@@ -346,9 +346,9 @@ public final class ProfileCardBuilder {
     ) {
         VBox card = new VBox(11);
         card.getStyleClass().addAll("teacher-card", "table-row");
-        card.setPrefWidth(345);
-        card.setMinWidth(305);
-        card.setMaxWidth(420);
+        card.setPrefWidth(390);
+        card.setMinWidth(340);
+        card.setMaxWidth(450);
 
         // Top row: Avatar + Name/Nationality + Status Badge (qEP / qCV / Update Required)
         HBox header = new HBox(12);
@@ -415,7 +415,7 @@ public final class ProfileCardBuilder {
         infoRow.getChildren().addAll(availLabel, spacer, shareBadge);
 
         // Fifth row: Role actions
-        HBox actions = new HBox(7);
+        FlowPane actions = new FlowPane(7, 7);
         actions.setAlignment(Pos.CENTER_LEFT);
         actions.setPadding(new Insets(4, 0, 0, 0));
 
@@ -470,9 +470,9 @@ public final class ProfileCardBuilder {
     ) {
         VBox card = new VBox(11);
         card.getStyleClass().addAll("teacher-card", "table-row");
-        card.setPrefWidth(345);
-        card.setMinWidth(305);
-        card.setMaxWidth(420);
+        card.setPrefWidth(390);
+        card.setMinWidth(340);
+        card.setMaxWidth(450);
 
         HBox header = new HBox(12);
         header.setAlignment(Pos.CENTER_LEFT);
@@ -529,7 +529,7 @@ public final class ProfileCardBuilder {
                 + " · Available: " + nn(teacher.getAvailableStartDate(), nn(teacher.getAvailability(), "Immediate")));
         availLabel.getStyleClass().add("small");
 
-        HBox actions = new HBox(7);
+        FlowPane actions = new FlowPane(7, 7);
         actions.setAlignment(Pos.CENTER_LEFT);
         actions.setPadding(new Insets(4, 0, 0, 0));
 
@@ -559,7 +559,7 @@ public final class ProfileCardBuilder {
 
         actions.getChildren().addAll(viewBtn, cvBtn, videoBtn, bookBtn);
         if (onToggleShortlist != null) {
-            Button shortlistBtn = new Button(isShortlisted ? "★" : "☆");
+            Button shortlistBtn = new Button(isShortlisted ? "★ Shortlisted" : "☆ Shortlist");
             shortlistBtn.getStyleClass().addAll(isShortlisted ? "primary" : "secondary", "button-sm");
             shortlistBtn.setOnAction(e -> onToggleShortlist.run());
             actions.getChildren().add(shortlistBtn);
