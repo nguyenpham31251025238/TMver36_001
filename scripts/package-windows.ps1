@@ -81,7 +81,7 @@ Write-Host "Running jpackage for self-contained app-image..."
     --icon $iconPath `
     --main-jar "TMver36-1.0-SNAPSHOT.jar" `
     --main-class "com.example.tmver36.Launcher" `
-    --add-modules "java.base,java.desktop,java.xml,java.logging,java.scripting,java.naming,java.prefs,java.datatransfer,java.net.http,jdk.crypto.ec,jdk.unsupported"
+    --add-modules "java.base,java.desktop,java.xml,java.logging,java.scripting,java.naming,java.prefs,java.datatransfer,java.net.http,java.sql,jdk.crypto.ec,jdk.unsupported,jdk.jsobject,jdk.xml.dom"
 if ($LASTEXITCODE -ne 0) {
     throw "jpackage failed for app-image with exit code $LASTEXITCODE"
 }
