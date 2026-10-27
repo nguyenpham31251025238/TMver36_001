@@ -193,7 +193,14 @@ public class TeacherDocumentsController {
             return;
         }
         boolean isHttp = urlOrPath.startsWith("https://") || urlOrPath.startsWith("http://");
-        boolean isLocal = urlOrPath.startsWith("file:") || (!urlOrPath.isBlank() && Files.exists(Path.of(urlOrPath)));
+        boolean isLocal = false;
+        if (!isHttp && !urlOrPath.isBlank()) {
+            try {
+                isLocal = urlOrPath.startsWith("file:") || Files.exists(Path.of(urlOrPath));
+            } catch (Exception ignored) {
+                isLocal = false;
+            }
+        }
         if (!urlOrPath.isBlank() && !isHttp && !isLocal) {
             showError("Invalid document URL", "Use an http(s) URL or select an existing local file.");
             return;
