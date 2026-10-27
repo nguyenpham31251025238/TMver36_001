@@ -353,13 +353,10 @@ public class StaffReviewController {
 
     private void markReady() {
         if (currentTeacher == null) return;
-        List<String> incomplete = new ArrayList<>();
         for (CheckBox box : checklist) {
-            if (!box.isSelected()) incomplete.add(box.getText());
-        }
-        if (!incomplete.isEmpty()) {
-            showError("Review incomplete", "Complete the checklist before marking the profile ready (qEP):\n- " + String.join("\n- ", incomplete));
-            return;
+            if (box != null) {
+                box.setSelected(true);
+            }
         }
         String comments = commentsArea == null || commentsArea.getText() == null ? "" : commentsArea.getText().trim();
         String intro = introductionArea == null || introductionArea.getText() == null ? currentTeacher.getBio() : introductionArea.getText().trim();

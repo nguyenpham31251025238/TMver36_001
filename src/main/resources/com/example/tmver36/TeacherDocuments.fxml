@@ -56,7 +56,7 @@
               <HBox alignment="CENTER_LEFT" spacing="12">
                 <VBox spacing="6">
                   <Label styleClass="page-title" text="CV &amp; Documents" />
-                  <Label styleClass="muted" text="Upload and manage your CV, teaching certificates, and demo videos. Files are linked directly to your account and synced for Staff and Partner review." wrapText="true" />
+                  <Label styleClass="muted" text="Upload and manage your CV, teaching certificates, and teaching videos. Files are linked directly to your account and synced for Staff and Partner review." wrapText="true" />
                   <Label styleClass="muted" text="Note: Ensure your CV does not contain personal contact details or external links." textFill="#DC2626" wrapText="true" />
                 </VBox>
                 <Region HBox.hgrow="ALWAYS" />
@@ -89,8 +89,12 @@
                 <HBox alignment="BOTTOM_LEFT" spacing="12">
                   <Button fx:id="chooseFileButton" styleClass="secondary" text="Choose file from device" />
                   <VBox spacing="6" HBox.hgrow="ALWAYS">
-                    <Label styleClass="field-label" text="Selected file path or URL" />
-                    <TextField fx:id="documentUrl" promptText="Select a local file or enter https://..." text="" />
+                    <Label styleClass="field-label" text="Selected file path or Google Drive URL" />
+                    <TextField fx:id="documentUrl" promptText="Select a local file (under 100 MB) or paste Google Drive link..." text="" />
+                  </VBox>
+                  <VBox spacing="6" prefWidth="190">
+                    <Label styleClass="field-label" text="Video Duration (sec / mm:ss)" />
+                    <TextField fx:id="videoDurationField" promptText="Intro max 60s, Teaching max 300s" text="" />
                   </VBox>
                   <Button fx:id="addDocumentButton" styleClass="primary" text="Save &amp; Upload Document" />
                 </HBox>
@@ -105,7 +109,7 @@
                   <Button fx:id="viewCvButton" styleClass="button-sm,secondary" text="Open CV" />
                   <Button fx:id="viewCertificateButton" styleClass="button-sm,secondary" text="Open Certificate" />
                   <Button fx:id="viewIntroButton" styleClass="button-sm,secondary" text="Watch Intro" />
-                  <Button fx:id="viewDemoButton" styleClass="button-sm,secondary" text="Watch Demo" />
+                  <Button fx:id="viewDemoButton" styleClass="button-sm,secondary" text="Watch Teaching Video" />
                   <Button fx:id="deleteCvButton" managed="false" styleClass="button-sm,danger" text="Delete CV" visible="false" />
                 </HBox>
 

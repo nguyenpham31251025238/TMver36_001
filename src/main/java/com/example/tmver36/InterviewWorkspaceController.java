@@ -24,7 +24,11 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import java.util.stream.Collectors;
 
 /** Controller for staff interview coordination, schedule adjustment, and result tracking (InterviewWorkspace.fxml). */
@@ -45,7 +49,11 @@ public class InterviewWorkspaceController {
     @FXML private DatePicker rescheduleDatePicker;
     @FXML private ComboBox<String> rescheduleFromCombo;
     @FXML private ComboBox<String> rescheduleToCombo;
+    @FXML private Button addDraftSlotButton;
+    @FXML private Button saveMultiSlotsButton;
     @FXML private Button rescheduleInterviewButton;
+    @FXML private VBox draftSlotsBox;
+    private final List<PortalStore.TimeSlotSpec> draftSlots = new ArrayList<>();
     @FXML private TextField staffResultNotesField;
     @FXML private Button markInterviewSuccessButton;
     @FXML private Button createMeetButton;
@@ -68,7 +76,10 @@ public class InterviewWorkspaceController {
         refreshInterviews();
         if (createMeetButton != null) createMeetButton.setOnAction(event -> openMeetCreationPage());
         if (finalizeInterviewButton != null) finalizeInterviewButton.setOnAction(event -> finalizeSelectedInterview());
+        if (addDraftSlotButton != null) addDraftSlotButton.setOnAction(event -> handleAddDraftSlot());
+        if (saveMultiSlotsButton != null) saveMultiSlotsButton.setOnAction(event -> handleSaveMultiSlots());
         if (rescheduleInterviewButton != null) rescheduleInterviewButton.setOnAction(event -> rescheduleSelectedInterview());
+        refreshDraftSlotsBox();
         if (updateHistoryButton != null) updateHistoryButton.setOnAction(event -> updateSelectedInterviewHistory());
         if (markInterviewSuccessButton != null) {
             markInterviewSuccessButton.setOnAction(event -> markSelectedInterviewSuccessful());
@@ -220,7 +231,117 @@ public class InterviewWorkspaceController {
         }
     }
 
+    public List<PortalStore.TimeSlotSpec> getDraftSlots() {
+        return Collections.unmodifiableList(draftSlots);
+    }
+
+    public boolean addDraftSlot(LocalDate date, LocalTime start, LocalTime end) {
+        if (date == null || start == null || end == null) {
+            showError("Missing schedule details", "Choose a date, start time, and end time (HH:mm).");
+            return false;
+        }
+        if (!end.isAfter(start)) {
+            showError("Invalid time range", "End time must be after start time.");
+            return false;
+        }
+        PortalStore.TimeSlotSpec candidate = new PortalStore.TimeSlotSpec(date, start, end);
+        for (PortalStore.TimeSlotSpec existing : draftSlots) {
+            if (candidate.startAt().isBefore(existing.endAt()) && candidate.endAt().isAfter(existing.startAt())) {
+                showError("Overlapping slot in setup",
+                        "Slot overlaps with another slot in your setup list: " + existing.displayLabel());
+                return false;
+            }
+        }
+        draftSlots.add(candidate);
+        refreshDraftSlotsBox();
+        return true;
+    }
+
+    public boolean removeDraftSlot(int index) {
+        if (index < 0 || index >= draftSlots.size()) return false;
+        draftSlots.remove(index);
+        refreshDraftSlotsBox();
+        return true;
+    }
+
+    private void handleAddDraftSlot() {
+        LocalDate date = rescheduleDatePicker == null ? null : rescheduleDatePicker.getValue();
+        String fromText = comboText(rescheduleFromCombo);
+        String toText = comboText(rescheduleToCombo);
+        if (date == null || fromText.isBlank() || toText.isBlank()) {
+            showError("Missing schedule details", "Choose a date, start time, and end time (HH:mm).");
+            return;
+        }
+        try {
+            addDraftSlot(date, LocalTime.parse(fromText), LocalTime.parse(toText));
+        } catch (Exception ex) {
+            showError("Invalid time format", "Please enter times in HH:mm format (e.g. 14:00 to 14:30).");
+        }
+    }
+
+    public boolean handleSaveMultiSlots() {
+        Interview selected = selectedInterview();
+        if (selected == null) {
+            showError("No interview selected", "Select an interview to reschedule.");
+            return false;
+        }
+        if (draftSlots.isEmpty()) {
+            LocalDate date = rescheduleDatePicker == null ? null : rescheduleDatePicker.getValue();
+            String fromText = comboText(rescheduleFromCombo);
+            String toText = comboText(rescheduleToCombo);
+            if (date != null && !fromText.isBlank() && !toText.isBlank()) {
+                try {
+                    if (!addDraftSlot(date, LocalTime.parse(fromText), LocalTime.parse(toText))) {
+                        return false;
+                    }
+                } catch (Exception ex) {
+                    showError("Invalid time format", "Please enter times in HH:mm format.");
+                    return false;
+                }
+            }
+        }
+        if (draftSlots.isEmpty()) {
+            showError("No slots added", "Please add at least one time slot before saving.");
+            return false;
+        }
+        List<PortalStore.TimeSlotSpec> batch = new ArrayList<>(draftSlots);
+        if (!store.rescheduleInterviewMultiSlots(activeUsername(), selected.getId(), batch)) {
+            showError("Schedule Conflict / Validation Error", store.getLastValidationError());
+            return false;
+        }
+        int count = batch.size();
+        draftSlots.clear();
+        refreshDraftSlotsBox();
+        refreshInterviews();
+        showInfo("Interview Schedule Updated", "Saved and synchronized " + count + " time slot(s) for interview #" + selected.getId() + ".");
+        return true;
+    }
+
+    private void refreshDraftSlotsBox() {
+        if (draftSlotsBox == null) return;
+        draftSlotsBox.getChildren().clear();
+        for (int i = 0; i < draftSlots.size(); i++) {
+            final int idx = i;
+            PortalStore.TimeSlotSpec spec = draftSlots.get(i);
+            HBox row = new HBox(10);
+            row.setAlignment(Pos.CENTER_LEFT);
+            Label lbl = new Label("Slot #" + (i + 1) + ": " + spec.displayLabel());
+            lbl.setStyle("-fx-font-weight: 600; -fx-text-fill: #1E40AF;");
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            Button removeBtn = new Button("Remove");
+            removeBtn.getStyleClass().add("danger");
+            removeBtn.setOnAction(e -> removeDraftSlot(idx));
+            row.getChildren().addAll(lbl, spacer, removeBtn);
+            draftSlotsBox.getChildren().add(row);
+        }
+    }
+
     private void rescheduleSelectedInterview() {
+        if (!draftSlots.isEmpty()) {
+            handleSaveMultiSlots();
+            return;
+        }
         Interview selected = selectedInterview();
         if (selected == null) {
             showError("No interview selected", "Select an interview to reschedule.");

@@ -6,6 +6,8 @@ import com.example.tmver36.model.Interview;
 import com.example.tmver36.model.TeacherDocument;
 import com.example.tmver36.model.TeacherProfile;
 import com.example.tmver36.service.PortalStore;
+import com.example.tmver36.service.VideoValidator;
+import java.io.RandomAccessFile;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -315,7 +317,7 @@ class PortalStoreTest {
 
         // Task 10: Video upload, storage resolution, category lookup, and role-based authorization
         Path customVideo = tempDir.resolve("demo_teaching_lesson.mp4");
-        Files.write(customVideo, new byte[]{0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x6d, 0x70, 0x34, 0x32});
+        Files.write(customVideo, VideoValidator.buildValidMp4Bytes(25.0));
         TeacherDocument videoDoc = storeB.addOrReplaceDocument("teacher", 1L, "demo_teaching_lesson.mp4", "Intro video", customVideo.toString());
         assertNotNull(videoDoc);
         assertTrue(storeB.isVideoDocument(videoDoc));
@@ -401,5 +403,235 @@ class PortalStoreTest {
         assertTrue(store.notificationsForUser("partner").stream()
                 .anyMatch(n -> "INTERVIEW_RESULT".equals(n.getCategory()) && n.getMessage().contains("Interview Successful")),
                 "Partner must be notified when Staff updates interview result");
+    }
+
+    @Test
+    void group1TeacherProfileCreatedMarkedReadyDistributesToPartnersAndPersistsAcrossRefreshAndRelogin() {
+        Path dir = tempDir.resolve("group1_ready_partner");
+        PortalStore store = new PortalStore(dir);
+
+        // 1. Create a new Teacher account and profile
+        assertTrue(store.saveOrUpdateUser("admin", "teacher_new", "Liam O'Connor", "TEACHER", "liamPass123", true));
+        TeacherProfile liam = store.teacherForUser("teacher_new");
+        assertNotNull(liam);
+        liam.setNationality("Ireland");
+        liam.setSubject("ESL & Academic Writing");
+        liam.setExpectedSalary("$2,200");
+        liam.setExperience("3-5 years");
+        liam.setBio("Experienced ESL educator ready for placement.");
+        assertTrue(store.saveTeacherProfile("teacher_new", liam));
+        long liamId = liam.getId();
+
+        // Also create a second Partner account to verify distribution to all active partners
+        assertTrue(store.saveOrUpdateUser("admin", "partner_hanoi", "Hanoi International School", "PARTNER", "hanoi123", true));
+
+        // 2. Staff sees the newly created profile immediately
+        assertTrue(store.visibleTeachers("staff", "STAFF").stream().anyMatch(t -> t.getId() == liamId),
+                "Staff must see newly created Teacher profile");
+        // Before Mark as Ready, Partner cannot see PENDING profile
+        assertFalse(store.visibleTeachers("partner", "PARTNER").stream().anyMatch(t -> t.getId() == liamId),
+                "Partner must not see profile while status is still PENDING");
+
+        // 3. Staff clicks Mark as Ready (via saveReviewState or status)
+        boolean[] allChecked = new boolean[]{true, true, true, true, true};
+        assertTrue(store.saveReviewState("staff", liamId, "READY", "All documents verified.", allChecked, liam.getBio()));
+        assertEquals("READY", store.teacher(liamId).getStatus());
+
+        // 4. Partner immediately sees the READY profile without extra manual grant step
+        assertTrue(store.canPartnerAccessTeacher("partner", liamId),
+                "Marking teacher READY must automatically grant access to active partner");
+        assertTrue(store.canPartnerAccessTeacher("partner_hanoi", liamId),
+                "Marking teacher READY must automatically grant access to all active partner accounts");
+        assertTrue(store.visibleTeachers("partner", "PARTNER").stream().anyMatch(t -> t.getId() == liamId),
+                "Partner visibleTeachers must include the newly READY teacher");
+
+        // 5. After refresh (reloadLatestData) and re-login (new PortalStore instance from persisted state), Partner still sees profile
+        assertTrue(store.reloadLatestData().success());
+        assertTrue(store.visibleTeachers("partner", "PARTNER").stream().anyMatch(t -> t.getId() == liamId));
+
+        PortalStore reloginStore = new PortalStore(dir);
+        assertNotNull(reloginStore.authenticate("partner", "partner123"));
+        assertTrue(reloginStore.visibleTeachers("partner", "PARTNER").stream().anyMatch(t -> t.getId() == liamId),
+                "Partner must still see READY teacher after logging out and logging back in");
+        assertNotNull(reloginStore.authenticate("partner_hanoi", "hanoi123"));
+        assertTrue(reloginStore.visibleTeachers("partner_hanoi", "PARTNER").stream().anyMatch(t -> t.getId() == liamId),
+                "Custom Partner account must also see READY teacher after re-login");
+
+        // 6. Staff can still explicitly revoke access for a specific Partner and it stays revoked across reload
+        assertTrue(reloginStore.revoke("staff", "partner_hanoi", liamId));
+        assertFalse(reloginStore.canPartnerAccessTeacher("partner_hanoi", liamId));
+        PortalStore afterRevokeStore = new PortalStore(dir);
+        assertFalse(afterRevokeStore.canPartnerAccessTeacher("partner_hanoi", liamId),
+                "Explicitly revoked partner access must remain revoked after reload");
+        assertTrue(afterRevokeStore.canPartnerAccessTeacher("partner", liamId),
+                "Other active partners retain access");
+    }
+
+    @Test
+    void group2VideoMp4PlaybackSizeLimitDurationValidationGoogleDriveLinksAndTeachingVideoRenameWork() throws Exception {
+        Path dir = tempDir.resolve("group2_video");
+        PortalStore store = new PortalStore(dir);
+
+        // 1. Legacy "Demo video" / "Demo Video" data is normalized and preserved as "Teaching video"
+        TeacherDocument legacyDoc = new TeacherDocument(99L, 1L, "legacy_lesson.mp4", "Demo Video", "2026-10-27 10:00 (UTC+7)", "https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz12345/view");
+        assertEquals("Teaching video", legacyDoc.type(), "Legacy Demo Video type must normalize to Teaching video");
+        assertTrue(store.documents(1L).stream().anyMatch(d -> "Teaching video".equalsIgnoreCase(d.type())),
+                "Seeded video documents must use Teaching video type");
+        assertTrue(store.documents(1L).stream().noneMatch(d -> "Demo video".equalsIgnoreCase(d.type())),
+                "No document should remain labeled Demo video");
+
+        // 2. Valid MP4 upload for Intro video (<= 60s) and Teaching video (<= 300s)
+        Path validIntroMp4 = tempDir.resolve("valid_intro_45s.mp4");
+        Files.write(validIntroMp4, VideoValidator.buildValidMp4Bytes(45.0));
+        TeacherDocument introDoc = store.addOrReplaceDocument("teacher", 1L, "valid_intro_45s.mp4", "Intro video", validIntroMp4.toString());
+        assertNotNull(introDoc, "45s Intro MP4 (< 60s, < 100MB) must be accepted");
+
+        Path validTeachingMp4 = tempDir.resolve("valid_teaching_240s.mp4");
+        Files.write(validTeachingMp4, VideoValidator.buildValidMp4Bytes(240.0));
+        TeacherDocument teachingDoc = store.addOrReplaceDocument("teacher", 1L, "valid_teaching_240s.mp4", "Teaching video", validTeachingMp4.toString());
+        assertNotNull(teachingDoc, "240s Teaching MP4 (< 300s, < 100MB) must be accepted");
+
+        // 3. Duration limit enforcement on local MP4 files:
+        // Intro video > 60s (e.g. 75s) must be rejected
+        Path longIntroMp4 = tempDir.resolve("long_intro_75s.mp4");
+        Files.write(longIntroMp4, VideoValidator.buildValidMp4Bytes(75.0));
+        assertNull(store.addOrReplaceDocument("teacher", 1L, "long_intro_75s.mp4", "Intro video", longIntroMp4.toString()),
+                "Intro video > 60s must be rejected");
+        assertTrue(store.getLastValidationError().contains("1 minute"),
+                "Error message must explain the 1-minute limit: " + store.getLastValidationError());
+
+        // Teaching video > 300s (e.g. 360s) must be rejected
+        Path longTeachingMp4 = tempDir.resolve("long_teaching_360s.mp4");
+        Files.write(longTeachingMp4, VideoValidator.buildValidMp4Bytes(360.0));
+        assertNull(store.addOrReplaceDocument("teacher", 1L, "long_teaching_360s.mp4", "Teaching video", longTeachingMp4.toString()),
+                "Teaching video > 300s must be rejected");
+        assertTrue(store.getLastValidationError().contains("5 minutes"),
+                "Error message must explain the 5-minute limit: " + store.getLastValidationError());
+
+        // 4. File size limit (>= 100 MB) must be blocked with Google Drive instructions
+        Path hugeMp4 = tempDir.resolve("oversized_100mb.mp4");
+        try (RandomAccessFile raf = new RandomAccessFile(hugeMp4.toFile(), "rw")) {
+            byte[] header = VideoValidator.buildValidMp4Bytes(30.0);
+            raf.write(header);
+            raf.setLength(VideoValidator.MAX_VIDEO_FILE_BYTES); // Exactly 100 MB (>= 100 MB limit)
+        }
+        assertNull(store.addOrReplaceDocument("teacher", 1L, "oversized_100mb.mp4", "Teaching video", hugeMp4.toString()),
+                "File >= 100 MB must be blocked");
+        assertTrue(store.getLastValidationError().toLowerCase().contains("google drive"),
+                "Oversized video error must instruct Teacher to upload to Google Drive and paste the link");
+        Files.deleteIfExists(hugeMp4);
+
+        // 5. Google Drive link support + duration verification for both Intro video and Teaching video
+        // Invalid non-Drive URL rejected
+        assertNull(store.addOrReplaceDocument("teacher", 1L, "bad_link", "Intro video", "https://example.com/not-drive.mp4", 30.0),
+                "Non-Google Drive URL must be rejected for video link");
+
+        // Valid Google Drive URL but unverified duration (when Drive cannot be probed offline) rejected
+        String driveIntroUrl = "https://drive.google.com/file/d/1IntroVideoFileId9876543210/view?usp=sharing";
+        assertNull(store.addOrReplaceDocument("teacher", 1L, "Drive_Intro_Unverified", "Intro video", driveIntroUrl, null),
+                "Google Drive link without verified duration must not be assumed valid");
+
+        // Google Drive URL with duration > 60s for Intro video rejected
+        assertNull(store.addOrReplaceDocument("teacher", 1L, "Drive_Intro_TooLong", "Intro video", driveIntroUrl, 90.0),
+                "Google Drive Intro video > 60s must be rejected");
+
+        // Google Drive URL with duration > 300s for Teaching video rejected
+        String driveTeachingUrl = "https://drive.google.com/file/d/1TeachingVideoFileId9876543210/view?usp=sharing";
+        assertNull(store.addOrReplaceDocument("teacher", 1L, "Drive_Teaching_TooLong", "Teaching video", driveTeachingUrl, 345.0),
+                "Google Drive Teaching video > 300s must be rejected");
+
+        // Valid Google Drive URL with valid duration <= 60s (Intro) and <= 300s (Teaching) accepted
+        TeacherDocument driveIntroDoc = store.addOrReplaceDocument("teacher", 1L, "Drive_Intro_50s", "Intro video", driveIntroUrl, 50.0);
+        assertNotNull(driveIntroDoc, "Valid Google Drive Intro video (50s <= 60s) must be saved");
+        TeacherDocument driveTeachingDoc = store.addOrReplaceDocument("teacher", 1L, "Drive_Teaching_210s", "Teaching video", driveTeachingUrl, 210.0);
+        assertNotNull(driveTeachingDoc, "Valid Google Drive Teaching video (210s <= 300s) must be saved");
+
+        // 6. Role-based playback & persistence after reload/refresh
+        // Re-upload local MP4 for Intro video so we verify both local MP4 and Google Drive Teaching video after reload
+        store.addOrReplaceDocument("teacher", 1L, "valid_intro_45s.mp4", "Intro video", validIntroMp4.toString());
+        PortalStore reloaded = new PortalStore(dir);
+        TeacherDocument reloadedIntro = ProfileCardBuilder.findDocumentByCategory(reloaded, 1L, "Intro video");
+        TeacherDocument reloadedTeaching = ProfileCardBuilder.findDocumentByCategory(reloaded, 1L, "Teaching video");
+        assertNotNull(reloadedIntro);
+        assertNotNull(reloadedTeaching);
+        assertNotNull(reloaded.resolveDocumentLocalFile(reloadedIntro), "Local MP4 must resolve after reload");
+        assertTrue(VideoValidator.isGoogleDriveUrl(reloadedTeaching.location()), "Google Drive link must persist after reload");
+
+        assertTrue(reloaded.canUserAccessDocument("teacher", reloadedIntro));
+        assertTrue(reloaded.canUserAccessDocument("staff", reloadedIntro));
+        assertTrue(reloaded.canUserAccessDocument("partner", reloadedIntro));
+        assertTrue(reloaded.canUserAccessDocument("partner", reloadedTeaching));
+    }
+
+    @Test
+    void group3MultiSlotInterviewSetupAddRemoveSaveOverlapValidationAndConfirmationWorkflowWork() {
+        Path dir = tempDir.resolve("group3_multislot");
+        PortalStore store = new PortalStore(dir);
+
+        LocalDate d1 = LocalDate.now().plusDays(5);
+        LocalDate d2 = LocalDate.now().plusDays(6);
+
+        // 1. Reject batch with invalid time (endTime <= startTime)
+        List<PortalStore.TimeSlotSpec> invalidRangeBatch = List.of(
+                new PortalStore.TimeSlotSpec(d1, LocalTime.of(10, 0), LocalTime.of(9, 30))
+        );
+        assertFalse(store.addAvailabilitySlotsBatch("teacher", 1L, invalidRangeBatch),
+                "Slot with endTime <= startTime must be rejected");
+        assertTrue(store.getLastValidationError().toLowerCase().contains("end time"));
+
+        // 2. Reject batch with internal overlap between two slots in the same setup
+        List<PortalStore.TimeSlotSpec> internalOverlapBatch = List.of(
+                new PortalStore.TimeSlotSpec(d1, LocalTime.of(9, 0), LocalTime.of(10, 0)),
+                new PortalStore.TimeSlotSpec(d1, LocalTime.of(9, 30), LocalTime.of(10, 30))
+        );
+        assertFalse(store.addAvailabilitySlotsBatch("teacher", 1L, internalOverlapBatch),
+                "Overlapping slots within the same setup must be rejected");
+        assertTrue(store.getLastValidationError().toLowerCase().contains("overlap"));
+
+        // 3. Save valid multiple availability slots in one setup
+        List<PortalStore.TimeSlotSpec> validTeacherBatch = List.of(
+                new PortalStore.TimeSlotSpec(d1, LocalTime.of(9, 0), LocalTime.of(9, 45)),
+                new PortalStore.TimeSlotSpec(d1, LocalTime.of(10, 0), LocalTime.of(10, 45)),
+                new PortalStore.TimeSlotSpec(d2, LocalTime.of(14, 0), LocalTime.of(14, 45))
+        );
+        assertTrue(store.addAvailabilitySlotsBatch("teacher", 1L, validTeacherBatch),
+                "Valid multi-slot batch must be saved in one setup");
+        assertEquals(3, store.availabilitySlots(1L).stream()
+                .filter(s -> s.startAt().toLocalDate().equals(d1) || s.startAt().toLocalDate().equals(d2))
+                .count());
+
+        // 4. Reject new batch that conflicts with already saved slot
+        List<PortalStore.TimeSlotSpec> conflictWithExistingSlot = List.of(
+                new PortalStore.TimeSlotSpec(d1, LocalTime.of(9, 15), LocalTime.of(9, 50))
+        );
+        assertFalse(store.addAvailabilitySlotsBatch("teacher", 1L, conflictWithExistingSlot),
+                "Slot conflicting with existing availability slot must be rejected");
+
+        // 5. Multi-slot interview reschedule/proposal by Partner/Staff + conflict check + Teacher confirmation workflow
+        Interview interview = store.visibleInterviews("PARTNER", "partner").get(0);
+        LocalDate idate = LocalDate.now().plusDays(8);
+        List<PortalStore.TimeSlotSpec> proposedMultiSlots = List.of(
+                new PortalStore.TimeSlotSpec(idate, LocalTime.of(13, 0), LocalTime.of(13, 30)),
+                new PortalStore.TimeSlotSpec(idate, LocalTime.of(15, 0), LocalTime.of(15, 30)),
+                new PortalStore.TimeSlotSpec(idate.plusDays(1), LocalTime.of(10, 0), LocalTime.of(10, 30))
+        );
+        assertTrue(store.rescheduleInterviewMultiSlots("partner", interview.getId(), proposedMultiSlots),
+                "Partner should be able to save multiple interview time slots in one setup");
+
+        // Verify persistence across PortalStore reload
+        PortalStore reloaded = new PortalStore(dir);
+        Interview reloadedInterview = reloaded.findInterview(interview.getId());
+        assertNotNull(reloadedInterview);
+        assertEquals(3, reloadedInterview.getProposedSlots().size(),
+                "All 3 proposed interview slots must persist across store reload");
+
+        // Teacher confirms the second proposed slot
+        String chosenSlot = reloadedInterview.getProposedSlots().get(1);
+        assertTrue(reloaded.confirmInterviewSlot("teacher", interview.getId(), chosenSlot),
+                "Teacher must be able to confirm one of the proposed multi-slots");
+        Interview confirmed = reloaded.findInterview(interview.getId());
+        assertEquals("CONFIRMED", confirmed.getStatus());
+        assertEquals(LocalDateTime.of(idate, LocalTime.of(15, 0)).toString(), confirmed.getDateTime());
+        assertEquals(LocalDateTime.of(idate, LocalTime.of(15, 30)).toString(), confirmed.getEndDateTime());
     }
 }

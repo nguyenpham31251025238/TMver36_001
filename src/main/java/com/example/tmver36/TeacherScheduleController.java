@@ -28,6 +28,9 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -52,7 +55,12 @@ public class TeacherScheduleController {
     @FXML private DatePicker availabilityDate;
     @FXML private ComboBox<String> fromCombo;
     @FXML private ComboBox<String> toCombo;
+    @FXML private Button addDraftSlotButton;
+    @FXML private Button saveBatchSlotsButton;
     @FXML private Button addSlotButton;
+    @FXML private VBox draftSlotsBox;
+    @FXML private ComboBox<String> proposedSlotCombo;
+    private final List<PortalStore.TimeSlotSpec> draftSlots = new ArrayList<>();
     @FXML private Button removeSlotButton;
     @FXML private Button removeSlot2Button;
     @FXML private VBox slotsTable;
@@ -189,9 +197,117 @@ public class TeacherScheduleController {
     }
 
     private void wireSlotActions() {
+        if (addDraftSlotButton != null) addDraftSlotButton.setOnAction(e -> handleAddDraftSlot());
+        if (saveBatchSlotsButton != null) saveBatchSlotsButton.setOnAction(e -> handleSaveBatchSlots());
         if (addSlotButton != null) addSlotButton.setOnAction(e -> addSlot());
         if (removeSlotButton != null) removeSlotButton.setOnAction(e -> removeSlotByButton(removeSlotButton));
         if (removeSlot2Button != null) removeSlot2Button.setOnAction(e -> removeSlotByButton(removeSlot2Button));
+        refreshDraftSlotsBox();
+    }
+
+    public List<PortalStore.TimeSlotSpec> getDraftSlots() {
+        return Collections.unmodifiableList(draftSlots);
+    }
+
+    public boolean addDraftSlot(LocalDate date, LocalTime start, LocalTime end) {
+        if (date == null || start == null || end == null) {
+            setMessage("Choose a date and both start and end times before adding a slot.");
+            return false;
+        }
+        if (!end.isAfter(start)) {
+            setMessage("The end time must be later than the start time.");
+            return false;
+        }
+        PortalStore.TimeSlotSpec candidate = new PortalStore.TimeSlotSpec(date, start, end);
+        for (PortalStore.TimeSlotSpec existing : draftSlots) {
+            if (candidate.startAt().isBefore(existing.endAt()) && candidate.endAt().isAfter(existing.startAt())) {
+                setMessage("Slot overlaps with another slot in your current setup list: " + existing.displayLabel());
+                return false;
+            }
+        }
+        draftSlots.add(candidate);
+        refreshDraftSlotsBox();
+        setMessage("Added slot to setup list (" + draftSlots.size() + " slot(s) ready to save).");
+        return true;
+    }
+
+    public boolean removeDraftSlot(int index) {
+        if (index < 0 || index >= draftSlots.size()) return false;
+        draftSlots.remove(index);
+        refreshDraftSlotsBox();
+        setMessage("Removed slot from setup list (" + draftSlots.size() + " remaining).");
+        return true;
+    }
+
+    private void handleAddDraftSlot() {
+        if (availabilityDate == null || availabilityDate.getValue() == null || fromCombo == null || toCombo == null) {
+            setMessage("Choose a date and both start and end times before adding a slot.");
+            return;
+        }
+        String from = fromCombo.getValue();
+        String to = toCombo.getValue();
+        if (from == null || to == null) {
+            setMessage("Choose a start time and an end time.");
+            return;
+        }
+        try {
+            addDraftSlot(availabilityDate.getValue(), LocalTime.parse(from), LocalTime.parse(to));
+        } catch (RuntimeException ex) {
+            setMessage("The selected time format is invalid.");
+        }
+    }
+
+    public boolean handleSaveBatchSlots() {
+        if (draftSlots.isEmpty()) {
+            if (availabilityDate != null && availabilityDate.getValue() != null && fromCombo != null && toCombo != null
+                    && fromCombo.getValue() != null && toCombo.getValue() != null) {
+                try {
+                    if (!addDraftSlot(availabilityDate.getValue(), LocalTime.parse(fromCombo.getValue()), LocalTime.parse(toCombo.getValue()))) {
+                        return false;
+                    }
+                } catch (RuntimeException ex) {
+                    setMessage("The selected time format is invalid.");
+                    return false;
+                }
+            }
+        }
+        if (draftSlots.isEmpty()) {
+            setMessage("Please add at least one time slot before saving.");
+            return false;
+        }
+        long teacherId = currentTeacherId();
+        List<PortalStore.TimeSlotSpec> batch = new ArrayList<>(draftSlots);
+        if (!STORE.addAvailabilitySlotsBatch(currentUsername(), teacherId, batch)) {
+            setMessage(STORE.getLastValidationError());
+            return false;
+        }
+        int savedCount = batch.size();
+        draftSlots.clear();
+        refreshDraftSlotsBox();
+        slots.setAll(STORE.availabilitySlots(teacherId));
+        renderSlots();
+        setMessage("Saved " + savedCount + " availability slot(s).");
+        return true;
+    }
+
+    private void refreshDraftSlotsBox() {
+        if (draftSlotsBox == null) return;
+        draftSlotsBox.getChildren().clear();
+        for (int i = 0; i < draftSlots.size(); i++) {
+            final int idx = i;
+            PortalStore.TimeSlotSpec spec = draftSlots.get(i);
+            HBox row = new HBox(10);
+            row.setAlignment(Pos.CENTER_LEFT);
+            Label lbl = new Label("Draft Slot #" + (i + 1) + ": " + spec.displayLabel());
+            lbl.setStyle("-fx-font-weight: 600; -fx-text-fill: #1E40AF;");
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            Button removeBtn = new Button("Remove");
+            removeBtn.getStyleClass().add("danger");
+            removeBtn.setOnAction(e -> removeDraftSlot(idx));
+            row.getChildren().addAll(lbl, spacer, removeBtn);
+            draftSlotsBox.getChildren().add(row);
+        }
     }
 
     private void wireInterviewActions() {
@@ -400,6 +516,24 @@ public class TeacherScheduleController {
     private void updatePendingInterview(String status) {
         if (pendingInterviewId < 0) {
             setMessage("There is no pending interview request to update.");
+            return;
+        }
+        Interview pending = STORE.findInterview(pendingInterviewId);
+        if ("CONFIRMED".equalsIgnoreCase(status) && pending != null && pending.getProposedSlots() != null && !pending.getProposedSlots().isEmpty()) {
+            String selectedPair = pending.getProposedSlots().get(0);
+            if (proposedSlotCombo != null && proposedSlotCombo.getValue() != null) {
+                int selIdx = proposedSlotCombo.getSelectionModel().getSelectedIndex();
+                if (selIdx >= 0 && selIdx < pending.getProposedSlots().size()) {
+                    selectedPair = pending.getProposedSlots().get(selIdx);
+                }
+            }
+            if (!STORE.confirmInterviewSlot(currentUsername(), pendingInterviewId, selectedPair)) {
+                setMessage(STORE.getLastValidationError());
+                return;
+            }
+            refreshInterviews();
+            renderNotifications();
+            setMessage("Interview confirmed for selected time slot.");
             return;
         }
         String link = meetLinkField == null ? "" : safe(meetLinkField.getText());

@@ -26,7 +26,7 @@ public final class CloudSyncService {
     private static final String DEFAULT_SUPABASE_URL = "https://fvlbezbjqupwlodqelaz.supabase.co";
     private static final String DEFAULT_PUBLISHABLE_KEY = "sb_publishable_3LKenU-kYZH2qL4eNKfWcw_znTEqVP4";
     private static final String DEFAULT_STATE_ID = "tmver36_shared_v2";
-    private static final int MAX_SYNC_FILE_BYTES = 25 * 1024 * 1024; // 25 MB safety cap for intro/demo videos
+    private static final long MAX_SYNC_FILE_BYTES = 100L * 1024L * 1024L; // 100 MB safety cap for intro/teaching videos
 
     private final HttpClient httpClient;
     private final String supabaseUrl;
@@ -289,7 +289,7 @@ public final class CloudSyncService {
         if (lower.endsWith(".gif")) return "image/gif";
         if (lower.endsWith(".webp")) return "image/webp";
         if (lower.endsWith(".html") || lower.endsWith(".htm")) return "text/html";
-        if (lower.endsWith(".mp4")) return "video/mp4";
+        if (lower.endsWith(".mp4") || lower.endsWith(".m4v")) return "video/mp4";
         if (lower.endsWith(".webm")) return "video/webm";
         if (lower.endsWith(".mov")) return "video/quicktime";
         if (lower.endsWith(".mkv")) return "video/x-matroska";

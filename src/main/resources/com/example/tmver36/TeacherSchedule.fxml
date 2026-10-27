@@ -113,8 +113,11 @@
                       </value>
                     </ComboBox>
                   </VBox>
-                  <Button fx:id="addSlotButton" styleClass="primary" text="Add time slot" />
+                  <Button fx:id="addDraftSlotButton" styleClass="secondary" text="+ Add to List" />
+                  <Button fx:id="saveBatchSlotsButton" styleClass="primary" text="Save All Slots" />
+                  <Button fx:id="addSlotButton" styleClass="secondary" text="Add time slot" />
                 </HBox>
+                <VBox fx:id="draftSlotsBox" spacing="6" />
                 <VBox fx:id="slotsTable" spacing="0" styleClass="table">
                   <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
                     <VBox alignment="CENTER_LEFT" maxWidth="230" minWidth="230" prefWidth="230" spacing="0">
@@ -155,6 +158,7 @@
                     <Label styleClass="muted" text="16/10/2026 · 14:00 - 14:30 · UTC+7" />
                   </VBox>
                   <Region HBox.hgrow="ALWAYS" />
+                  <ComboBox fx:id="proposedSlotCombo" prefWidth="250" promptText="Select proposed slot" visible="false" managed="false" />
                   <Button fx:id="declineInterviewButton" styleClass="danger" text="Decline" />
                   <Button fx:id="acceptInterviewButton" styleClass="primary" text="Confirm attendance" />
                 </HBox>

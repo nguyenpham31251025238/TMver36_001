@@ -24,7 +24,13 @@ import java.lang.reflect.Field;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
+import com.example.tmver36.model.TeacherDocument;
+import com.example.tmver36.model.TeacherProfile;
+import com.example.tmver36.service.VideoValidator;
+import javafx.scene.control.DatePicker;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -514,5 +520,149 @@ class FxmlAndNavigationTest {
             if (error.get() instanceof Error err) throw err;
             throw new RuntimeException(error.get());
         }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void allThreeRequirementGroupsEndToEndUiAndControllerVerification() throws Exception {
+        runOnFxThread(() -> {
+            LoginController.STORE.resetToSeedData();
+
+            // === GROUP 1: Teacher creates profile -> Staff views & clicks "Mark as Ready" -> Partner sees profile ===
+            // Create a brand new Teacher account and save profile via TeacherProfile.fxml
+            LoginController.STORE.saveOrUpdateUser("admin", "teacher_g1", "Hannah Nguyen", "TEACHER", "hannah123", true);
+            long hannahId = LoginController.STORE.teacherIdForUser("teacher_g1");
+            assertTrue(hannahId > 3L);
+
+            LoginController.setCurrentSession("teacher_g1", "TEACHER");
+            FXMLLoader tpLoader = new FXMLLoader(LoginController.class.getResource("TeacherProfile.fxml"));
+            Parent tpRoot = tpLoader.load();
+            new Scene(tpRoot, 1280, 800);
+            TeacherProfileController tpCtrl = tpLoader.getController();
+            getField(tpCtrl, "fullNameField", TextField.class).setText("Hannah Nguyen");
+            getField(tpCtrl, "locationCombo", TextField.class).setText("Ho Chi Minh City");
+            getField(tpCtrl, "expectedSalaryCombo", ComboBox.class).setValue("$2,000 - $2,500");
+            getField(tpCtrl, "saveDraftButton", Button.class).fire();
+
+            // Partner initially does NOT see Hannah (still PENDING/qCV)
+            LoginController.setCurrentSession("partner", "PARTNER");
+            FXMLLoader pdBeforeLoader = new FXMLLoader(LoginController.class.getResource("PartnerDashboard.fxml"));
+            Parent pdBeforeRoot = pdBeforeLoader.load();
+            new Scene(pdBeforeRoot, 1280, 800);
+            PartnerDashboardController pdBeforeCtrl = pdBeforeLoader.getController();
+            FlowPane gridBefore = getField(pdBeforeCtrl, "partnerCardGrid", FlowPane.class);
+            assertEquals(2, gridBefore.getChildren().size(), "Before Mark as Ready, Partner sees only 2 seeded Ready profiles");
+
+            // Staff opens StaffReview for Hannah and clicks "Mark as ready (qEP)" without manually ticking checkboxes first
+            LoginController.setCurrentSession("staff", "STAFF");
+            StaffReviewController.setSelectedTeacherId(hannahId);
+            FXMLLoader srLoader = new FXMLLoader(LoginController.class.getResource("StaffReview.fxml"));
+            Parent srRoot = srLoader.load();
+            new Scene(srRoot, 1280, 800);
+            StaffReviewController srCtrl = srLoader.getController();
+            Button markReadyBtn = getField(srCtrl, "readyStatusButton", Button.class);
+            markReadyBtn.fire();
+            assertEquals("READY", LoginController.STORE.teacher(hannahId).getStatus(),
+                    "Clicking Mark as ready in StaffReview must transition profile to READY");
+            assertTrue(LoginController.STORE.canPartnerAccessTeacher("partner", hannahId),
+                    "Marking Ready must grant Partner access automatically");
+
+            // Partner reloads / logs back in and opens PartnerDashboard -> sees Hannah (3 profiles now!)
+            LoginController.setCurrentSession("partner", "PARTNER");
+            FXMLLoader pdAfterLoader = new FXMLLoader(LoginController.class.getResource("PartnerDashboard.fxml"));
+            Parent pdAfterRoot = pdAfterLoader.load();
+            new Scene(pdAfterRoot, 1280, 800);
+            PartnerDashboardController pdAfterCtrl = pdAfterLoader.getController();
+            FlowPane gridAfter = getField(pdAfterCtrl, "partnerCardGrid", FlowPane.class);
+            assertEquals(3, gridAfter.getChildren().size(),
+                    "After Staff clicks Mark as Ready, PartnerDashboard must display the newly ready Teacher profile");
+
+            // === GROUP 2: Video MP4 player, <100MB limit, Drive link + duration validation, and Teaching Video rename ===
+            // Verify "Demo Video" is completely replaced by "Teaching Video" across UI screens
+            for (String screen : List.of("StaffReview.fxml", "PartnerProfile.fxml", "TeacherDocuments.fxml")) {
+                FXMLLoader l = new FXMLLoader(LoginController.class.getResource(screen));
+                Parent r = l.load();
+                boolean hasDemoVideoLabel = FxNodes.findAll(r, Label.class).stream()
+                        .map(Label::getText)
+                        .anyMatch(t -> t != null && t.toLowerCase().contains("demo video"));
+                boolean hasDemoVideoButton = FxNodes.findAll(r, Button.class).stream()
+                        .map(Button::getText)
+                        .anyMatch(t -> t != null && t.toLowerCase().contains("watch demo"));
+                assertFalse(hasDemoVideoLabel, screen + " must not contain Demo Video label");
+                assertFalse(hasDemoVideoButton, screen + " must not contain Watch Demo button");
+            }
+
+            // Teacher uploads valid MP4 and Google Drive link via TeacherDocumentsController
+            LoginController.setCurrentSession("teacher", "TEACHER");
+            FXMLLoader tdLoader = new FXMLLoader(LoginController.class.getResource("TeacherDocuments.fxml"));
+            Parent tdRoot = tdLoader.load();
+            new Scene(tdRoot, 1280, 800);
+            TeacherDocumentsController tdCtrl = tdLoader.getController();
+            ComboBox<String> docTypeCombo = getField(tdCtrl, "documentType", ComboBox.class);
+            TextField docSourceField = getField(tdCtrl, "documentUrl", TextField.class);
+            TextField durationField = getField(tdCtrl, "videoDurationField", TextField.class);
+            Button uploadBtn = getField(tdCtrl, "addDocumentButton", Button.class);
+
+            assertTrue(docTypeCombo.getItems().contains("Teaching video"), "Document type combo must include Teaching video");
+            assertFalse(docTypeCombo.getItems().contains("Demo video"), "Document type combo must not include Demo video");
+
+            docTypeCombo.setValue("Teaching video");
+            docSourceField.setText("https://drive.google.com/file/d/1ValidTeachingDriveVideoId12345/view?usp=sharing");
+            durationField.setText("240");
+            uploadBtn.fire();
+
+            TeacherDocument savedTeachingDoc = ProfileCardBuilder.findDocumentByCategory(LoginController.STORE, 1L, "Teaching video");
+            assertNotNull(savedTeachingDoc);
+            assertTrue(VideoValidator.isGoogleDriveUrl(savedTeachingDoc.location()));
+
+            // Verify Video Player pane builds cleanly for authorized roles
+            VBox playerPane = ProfileCardBuilder.createVideoPlayerPane(LoginController.STORE, "teacher", savedTeachingDoc, tdRoot, null);
+            assertNotNull(playerPane, "ProfileCardBuilder.createVideoPlayerPane must build an in-app video player pane");
+            assertFalse(playerPane.getChildren().isEmpty());
+
+            // === GROUP 3: Multi-slot setup (add, remove, save multiple slots, conflict validation & confirmation) ===
+            // 1. TeacherScheduleController multi-slot draft builder
+            LoginController.setCurrentSession("teacher", "TEACHER");
+            FXMLLoader tsLoader = new FXMLLoader(LoginController.class.getResource("TeacherSchedule.fxml"));
+            Parent tsRoot = tsLoader.load();
+            new Scene(tsRoot, 1280, 800);
+            TeacherScheduleController tsCtrl = tsLoader.getController();
+            LocalDate slotDate = LocalDate.now().plusDays(14);
+
+            assertTrue(tsCtrl.addDraftSlot(slotDate, LocalTime.of(9, 0), LocalTime.of(9, 45)));
+            assertTrue(tsCtrl.addDraftSlot(slotDate, LocalTime.of(10, 0), LocalTime.of(10, 45)));
+            assertTrue(tsCtrl.addDraftSlot(slotDate, LocalTime.of(11, 0), LocalTime.of(11, 45)));
+            assertEquals(3, tsCtrl.getDraftSlots().size());
+
+            // Overlapping draft slot is rejected
+            assertFalse(tsCtrl.addDraftSlot(slotDate, LocalTime.of(10, 15), LocalTime.of(11, 0)),
+                    "Overlapping slot in draft setup must be rejected");
+            // Invalid time (end <= start) is rejected
+            assertFalse(tsCtrl.addDraftSlot(slotDate, LocalTime.of(15, 0), LocalTime.of(14, 0)),
+                    "Invalid time range in draft setup must be rejected");
+
+            // Remove middle slot -> 2 slots remain
+            assertTrue(tsCtrl.removeDraftSlot(1));
+            assertEquals(2, tsCtrl.getDraftSlots().size());
+
+            // Save all draft slots in one operation
+            assertTrue(tsCtrl.handleSaveBatchSlots());
+            assertEquals(0, tsCtrl.getDraftSlots().size(), "Draft slots must clear after saving");
+            assertEquals(2, LoginController.STORE.availabilitySlots(1L).stream()
+                    .filter(s -> s.startAt().toLocalDate().equals(slotDate))
+                    .count(), "Both saved slots must be persisted in PortalStore");
+
+            // 2. PartnerInterviewController multi-slot setup & Teacher confirmation
+            LoginController.setCurrentSession("partner", "PARTNER");
+            FXMLLoader piLoader = new FXMLLoader(LoginController.class.getResource("PartnerInterview.fxml"));
+            Parent piRoot = piLoader.load();
+            new Scene(piRoot, 1280, 800);
+            PartnerInterviewController piCtrl = piLoader.getController();
+            LocalDate intDate = LocalDate.now().plusDays(16);
+            assertTrue(piCtrl.addDraftSlot(intDate, LocalTime.of(14, 0), LocalTime.of(14, 30)));
+            assertTrue(piCtrl.addDraftSlot(intDate, LocalTime.of(15, 0), LocalTime.of(15, 30)));
+            assertEquals(2, piCtrl.getDraftSlots().size());
+            assertTrue(piCtrl.handleSaveMultiSlots(), "Partner multi-slot schedule save must succeed");
+        });
     }
 }

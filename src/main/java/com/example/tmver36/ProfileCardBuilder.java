@@ -3,6 +3,16 @@ package com.example.tmver36;
 import com.example.tmver36.model.TeacherDocument;
 import com.example.tmver36.model.TeacherProfile;
 import com.example.tmver36.service.PortalStore;
+import com.example.tmver36.service.VideoValidator;
+import javafx.scene.Scene;
+import javafx.scene.control.Slider;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
+import javafx.scene.media.MediaView;
+import javafx.scene.web.WebView;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+import javafx.util.Duration;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -610,23 +620,178 @@ public final class ProfileCardBuilder {
             return false;
         }
         if (PortalStore.isVideoDocument(doc) && !Boolean.getBoolean("tm.test.suppressAlerts")) {
-            Path localFile = store.resolveDocumentLocalFile(doc);
-            Alert dialog = new Alert(Alert.AlertType.INFORMATION);
-            dialog.setTitle("Video Player — " + doc.fileName());
-            dialog.setHeaderText(doc.type() + " · " + doc.fileName());
-            String sourceDesc = localFile != null
-                    ? "Verified local/synced video file:\n" + localFile.toAbsolutePath()
-                    : "Verified video stream:\n" + doc.location();
-            dialog.setContentText(sourceDesc + "\n\nUpdated: " + doc.updatedAt() + " (UTC+7)\nAuthorized for @" + actor);
-            ButtonType downloadBtn = new ButtonType("Download Video");
-            dialog.getButtonTypes().setAll(downloadBtn, ButtonType.CLOSE);
-            dialog.showAndWait().ifPresent(choice -> {
-                if (choice == downloadBtn) {
-                    downloadDocumentToDisk(store, actor, doc, sourceNode);
-                }
-            });
+            showVideoPlayerModal(store, actor, doc, sourceNode);
         }
         return true;
+    }
+
+    /**
+     * Builds an in-app JavaFX Video Player pane using MediaView/MediaPlayer for MP4/MOV/M4V files
+     * or WebView embed for Google Drive video links.
+     */
+    public static VBox createVideoPlayerPane(PortalStore store, String actor, TeacherDocument doc, Node sourceNode, Runnable onClose) {
+        VBox root = new VBox(12);
+        root.setPadding(new Insets(16));
+        root.setStyle("-fx-background-color: #0F172A;");
+
+        String mimeType = store != null ? store.getDocumentMimeType(doc) : VideoValidator.detectMimeType(doc.location());
+        Label titleLabel = new Label(doc.type() + " — " + doc.fileName());
+        titleLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: 700; -fx-text-fill: #F8FAFC;");
+
+        Label metaLabel = new Label("MIME: " + mimeType + " · Updated: " + doc.updatedAt() + " (UTC+7) · Authorized: @" + actor);
+        metaLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #94A3B8;");
+
+        Path localFile = store != null ? store.resolveDocumentLocalFile(doc) : null;
+        String loc = doc.location() == null ? "" : doc.location().trim();
+        MediaPlayer[] activePlayer = new MediaPlayer[1];
+
+        if (VideoValidator.isGoogleDriveUrl(loc)) {
+            String previewUrl = VideoValidator.toGoogleDrivePreviewUrl(loc);
+            Double durSec = VideoValidator.extractDurationFromUrlQuery(loc);
+            if (durSec != null && durSec > 0) {
+                metaLabel.setText(metaLabel.getText() + " · Verified Duration: " + VideoValidator.formatDuration(durSec));
+            }
+            try {
+                WebView webView = new WebView();
+                webView.setPrefSize(760, 420);
+                webView.getEngine().load(previewUrl);
+                root.getChildren().addAll(titleLabel, metaLabel, webView);
+            } catch (Throwable t) {
+                Label fallback = new Label("Google Drive Video Stream Ready: " + previewUrl);
+                fallback.setStyle("-fx-text-fill: #E2E8F0; -fx-font-size: 13px;");
+                root.getChildren().addAll(titleLabel, metaLabel, fallback);
+            }
+        } else if (localFile != null && Files.isRegularFile(localFile)) {
+            double parsedDuration = -1.0;
+            try {
+                parsedDuration = VideoValidator.extractMp4DurationSeconds(localFile);
+            } catch (Exception ignored) {
+            }
+            if (parsedDuration > 0) {
+                metaLabel.setText(metaLabel.getText() + " · Duration: " + VideoValidator.formatDuration(parsedDuration));
+            }
+            String lowerName = localFile.getFileName().toString().toLowerCase(Locale.ROOT);
+            if (lowerName.endsWith(".html") || lowerName.endsWith(".htm")) {
+                try {
+                    WebView webView = new WebView();
+                    webView.setPrefSize(760, 420);
+                    webView.getEngine().load(localFile.toUri().toString());
+                    root.getChildren().addAll(titleLabel, metaLabel, webView);
+                } catch (Throwable ignored) {
+                    root.getChildren().addAll(titleLabel, metaLabel);
+                }
+            } else {
+                root.getChildren().addAll(titleLabel, metaLabel);
+                try {
+                    Media media = new Media(localFile.toUri().toString());
+                    MediaPlayer player = new MediaPlayer(media);
+                    activePlayer[0] = player;
+                    MediaView mediaView = new MediaView(player);
+                    mediaView.setFitWidth(760);
+                    mediaView.setFitHeight(420);
+                    mediaView.setPreserveRatio(true);
+
+                    StackPane videoContainer = new StackPane(mediaView);
+                    videoContainer.setPrefSize(760, 420);
+                    videoContainer.setStyle("-fx-background-color: #020617; -fx-background-radius: 8;");
+
+                    Button playBtn = new Button("▶ Play");
+                    Button pauseBtn = new Button("⏸ Pause");
+                    Button stopBtn = new Button("⏹ Stop");
+                    Slider seekSlider = new Slider(0, 100, 0);
+                    HBox.setHgrow(seekSlider, Priority.ALWAYS);
+                    final double fallbackDur = parsedDuration > 0 ? parsedDuration : 0.0;
+                    Label timeLabel = new Label("0:00 / " + VideoValidator.formatDuration(fallbackDur));
+                    timeLabel.setStyle("-fx-text-fill: #E2E8F0; -fx-font-size: 12px;");
+
+                    playBtn.setOnAction(e -> player.play());
+                    pauseBtn.setOnAction(e -> player.pause());
+                    stopBtn.setOnAction(e -> player.stop());
+
+                    player.currentTimeProperty().addListener((obs, oldTime, newTime) -> {
+                        Duration total = player.getTotalDuration();
+                        double totalSec = (total != null && !total.isUnknown() && total.toSeconds() > 0)
+                                ? total.toSeconds() : fallbackDur;
+                        double curSec = newTime != null ? newTime.toSeconds() : 0.0;
+                        if (totalSec > 0 && !seekSlider.isValueChanging()) {
+                            seekSlider.setValue(Math.min(100.0, (curSec / totalSec) * 100.0));
+                        }
+                        timeLabel.setText(VideoValidator.formatDuration(curSec) + " / " + VideoValidator.formatDuration(totalSec));
+                    });
+
+                    seekSlider.valueChangingProperty().addListener((obs, wasChanging, isChanging) -> {
+                        if (!isChanging) {
+                            Duration total = player.getTotalDuration();
+                            if (total != null && !total.isUnknown() && total.toSeconds() > 0) {
+                                player.seek(total.multiply(seekSlider.getValue() / 100.0));
+                            }
+                        }
+                    });
+
+                    HBox transportBar = new HBox(10, playBtn, pauseBtn, stopBtn, seekSlider, timeLabel);
+                    transportBar.setAlignment(Pos.CENTER_LEFT);
+                    root.getChildren().addAll(videoContainer, transportBar);
+                    player.setAutoPlay(true);
+                } catch (Throwable mediaEx) {
+                    Label fallbackInfo = new Label("Native codec notice: video file verified at " + localFile.toAbsolutePath()
+                            + ". Use 'Open in System Player' below if hardware decoding is unavailable.");
+                    fallbackInfo.setWrapText(true);
+                    fallbackInfo.setStyle("-fx-text-fill: #FDE68A; -fx-font-size: 12px;");
+                    root.getChildren().add(fallbackInfo);
+                }
+            }
+        } else {
+            root.getChildren().addAll(titleLabel, metaLabel);
+        }
+
+        Button openExternalBtn = new Button("Open in System Player / Browser");
+        openExternalBtn.setOnAction(e -> {
+            if (localFile != null && Files.isRegularFile(localFile)) {
+                PortalStore.openInBrowser(localFile.toUri().toString());
+            } else if (!loc.isEmpty()) {
+                PortalStore.openInBrowser(VideoValidator.isGoogleDriveUrl(loc) ? VideoValidator.toGoogleDriveViewUrl(loc) : loc);
+            }
+        });
+
+        Button downloadBtn = new Button("Download Video");
+        downloadBtn.setOnAction(e -> downloadDocumentToDisk(store, actor, doc, sourceNode));
+
+        Button closeBtn = new Button("Close");
+        closeBtn.setOnAction(e -> {
+            if (activePlayer[0] != null) {
+                try {
+                    activePlayer[0].stop();
+                    activePlayer[0].dispose();
+                } catch (Exception ignored) {
+                }
+            }
+            if (onClose != null) {
+                onClose.run();
+            }
+        });
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox footer = new HBox(10, openExternalBtn, downloadBtn, spacer, closeBtn);
+        footer.setAlignment(Pos.CENTER_LEFT);
+        root.getChildren().add(footer);
+        return root;
+    }
+
+    private static void showVideoPlayerModal(PortalStore store, String actor, TeacherDocument doc, Node sourceNode) {
+        try {
+            Stage stage = new Stage();
+            stage.initModality(Modality.APPLICATION_MODAL);
+            if (sourceNode != null && sourceNode.getScene() != null && sourceNode.getScene().getWindow() != null) {
+                stage.initOwner(sourceNode.getScene().getWindow());
+            }
+            stage.setTitle("TeacherMatch Video Player — " + doc.fileName());
+            VBox pane = createVideoPlayerPane(store, actor, doc, sourceNode, stage::close);
+            Scene scene = new Scene(pane, 800, 560);
+            stage.setScene(scene);
+            stage.showAndWait();
+        } catch (Throwable ignored) {
+        }
     }
 
     public static void downloadDocumentToDisk(PortalStore store, String actor, TeacherDocument doc, Node sourceNode) {

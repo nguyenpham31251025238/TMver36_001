@@ -53,6 +53,7 @@ public class PortalStore {
     private final List<String[]> logs = new ArrayList<>();
 
     private final Set<String> granted = new LinkedHashSet<>();
+    private final Set<String> revoked = new LinkedHashSet<>();
     private final Map<String, String[]> partnerEvaluations = new LinkedHashMap<>();
     private final Map<Long, String> documentBase64ById = new LinkedHashMap<>();
     private final List<NotificationItem> notifications = new ArrayList<>();
@@ -64,6 +65,7 @@ public class PortalStore {
     private final AtomicLong notificationIds = new AtomicLong(0);
 
     private int notificationLeadDays = 3;
+    private volatile long lastModifiedMs = System.currentTimeMillis();
     private volatile String lastValidationError = "";
     private volatile String simulatedReloadError = null;
 
@@ -121,15 +123,45 @@ public class PortalStore {
     }
 
     public synchronized boolean syncFromCloud() {
+        Path stateFile = getStateFilePath();
+        if (Files.isRegularFile(stateFile)) {
+            Properties diskProps = readPropertiesFromFile(stateFile);
+            if (diskProps != null) {
+                long diskTs = parseLong(diskProps.getProperty("state.lastModifiedMs"), 0L);
+                if (diskTs > this.lastModifiedMs) {
+                    loadFromProperties(diskProps);
+                }
+            }
+        }
         if (cloudSync == null || !cloudSync.isEnabled()) {
             return false;
         }
         Properties remoteProps = cloudSync.pullProperties();
-        if (remoteProps != null && loadFromProperties(remoteProps)) {
-            saveLocalOnly();
-            return true;
+        if (remoteProps != null) {
+            long remoteTs = parseLong(remoteProps.getProperty("state.lastModifiedMs"), 0L);
+            if (remoteTs > 0L && this.lastModifiedMs > remoteTs) {
+                cloudSync.pushProperties(toProperties());
+                return true;
+            }
+            if (loadFromProperties(remoteProps)) {
+                saveLocalOnly();
+                return true;
+            }
         }
         return false;
+    }
+
+    private Properties readPropertiesFromFile(Path file) {
+        if (file == null || !Files.isRegularFile(file)) {
+            return null;
+        }
+        Properties props = new Properties();
+        try (InputStream in = Files.newInputStream(file)) {
+            props.load(in);
+            return props;
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     public synchronized boolean pushToCloud() {
@@ -179,6 +211,7 @@ public class PortalStore {
         availabilitySlots.clear();
         logs.clear();
         granted.clear();
+        revoked.clear();
         partnerEvaluations.clear();
         documentBase64ById.clear();
         notifications.clear();
@@ -509,10 +542,16 @@ public class PortalStore {
             props.setProperty(prefix + "endAt", s.endAt().toString());
         }
 
+        props.setProperty("state.lastModifiedMs", Long.toString(lastModifiedMs));
         List<String> grantList = new ArrayList<>(granted);
         props.setProperty("grants.count", Integer.toString(grantList.size()));
         for (int i = 0; i < grantList.size(); i++) {
             props.setProperty("grant." + i, nn(grantList.get(i)));
+        }
+        List<String> revokedList = new ArrayList<>(revoked);
+        props.setProperty("revoked.count", Integer.toString(revokedList.size()));
+        for (int i = 0; i < revokedList.size(); i++) {
+            props.setProperty("revoked." + i, nn(revokedList.get(i)));
         }
 
         List<Map.Entry<String, String[]>> evalList = new ArrayList<>(partnerEvaluations.entrySet());
@@ -539,6 +578,7 @@ public class PortalStore {
             props.setProperty(prefix + "result", nn(iv.getResult()));
             props.setProperty(prefix + "feedback", nn(iv.getFeedback()));
             props.setProperty(prefix + "meetingUrl", nn(iv.getMeetingUrl()));
+            props.setProperty(prefix + "proposedSlots", nn(iv.getProposedSlotsSerialized()));
         }
 
         props.setProperty("config.notificationLeadDays", Integer.toString(notificationLeadDays));
@@ -589,6 +629,7 @@ public class PortalStore {
         if (suppressSave) {
             return;
         }
+        this.lastModifiedMs = Math.max(System.currentTimeMillis(), this.lastModifiedMs + 1L);
         Properties props = toProperties();
         try {
             Path dataDir = getDataDir();
@@ -754,11 +795,24 @@ public class PortalStore {
                 }
             }
 
+            this.lastModifiedMs = parseLong(props.getProperty("state.lastModifiedMs"), System.currentTimeMillis());
             int grantCount = parseInt(props.getProperty("grants.count"), 0);
             for (int i = 0; i < grantCount; i++) {
                 String grant = props.getProperty("grant." + i, "").trim();
                 if (!grant.isEmpty()) {
                     granted.add(grant);
+                }
+            }
+            int revokedCount = parseInt(props.getProperty("revoked.count"), 0);
+            for (int i = 0; i < revokedCount; i++) {
+                String rev = props.getProperty("revoked." + i, "").trim();
+                if (!rev.isEmpty()) {
+                    revoked.add(rev);
+                }
+            }
+            for (TeacherProfile tp : teachers) {
+                if ("READY".equalsIgnoreCase(CatalogData.normalizeStatusCode(tp.getStatus()))) {
+                    autoGrantReadyTeacherToActivePartners(tp.getId(), false);
                 }
             }
 
@@ -791,6 +845,7 @@ public class PortalStore {
                         props.getProperty(prefix + "meetingUrl", "")
                 );
                 iv.setEndDateTime(props.getProperty(prefix + "endDateTime", ""));
+                iv.setProposedSlotsSerialized(props.getProperty(prefix + "proposedSlots", ""));
                 if (iv.getMeetingUrl() == null || iv.getMeetingUrl().isBlank()
                         || iv.getMeetingUrl().startsWith("https://meet.google.com/tm-")
                         || iv.getMeetingUrl().equals("https://meet.google.com/abc-defg-hij")) {
@@ -1031,6 +1086,8 @@ public class PortalStore {
         users.put(cleanUsername, created);
         if ("TEACHER".equals(cleanRole)) {
             ensureTeacherProfileForUser(created);
+        } else if ("PARTNER".equals(cleanRole)) {
+            ensureReadyGrantsForPartner(cleanUsername);
         }
         log("ADMIN", "Created account " + cleanUsername);
         saveState();
@@ -1068,6 +1125,8 @@ public class PortalStore {
                 if (linked != null) {
                     linked.setFullName(cleanName);
                 }
+            } else if ("PARTNER".equals(role)) {
+                ensureReadyGrantsForPartner(cleanUsername);
             }
             log(actor == null ? "ADMIN" : actor, "Updated account " + cleanUsername);
             saveState();
@@ -1081,6 +1140,8 @@ public class PortalStore {
             users.put(cleanUsername, created);
             if ("TEACHER".equals(role)) {
                 ensureTeacherProfileForUser(created);
+            } else if ("PARTNER".equals(role)) {
+                ensureReadyGrantsForPartner(cleanUsername);
             }
             log(actor == null ? "ADMIN" : actor, "Created account " + cleanUsername);
             saveState();
@@ -1115,6 +1176,8 @@ public class PortalStore {
         user.setRole(role);
         if ("TEACHER".equals(role)) {
             ensureTeacherProfileForUser(user);
+        } else if ("PARTNER".equals(role)) {
+            ensureReadyGrantsForPartner(username);
         }
         log(actor, "Changed role for " + username + " from " + previousRole + " to " + role);
         saveState();
@@ -1294,7 +1357,14 @@ public class PortalStore {
         if (status != null && !status.isBlank()) {
             String normalizedStatus = CatalogData.normalizeStatusCode(status);
             teacher.setStatus(normalizedStatus);
+            if ("READY".equalsIgnoreCase(normalizedStatus)) {
+                if (checklistFlags == null || checklistFlags.length == 0) {
+                    teacher.setReviewChecklist("1,1,1,1,1");
+                }
+                autoGrantReadyTeacherToActivePartners(teacher.getId(), true);
+            }
         }
+        teacher.setUpdatedAt(nowUtc7String());
         log(actor, "Reviewed profile for " + teacher.getName() + " -> " + teacher.getStatus());
         saveState();
         return true;
@@ -1410,25 +1480,103 @@ public class PortalStore {
             String type,
             String sourcePathOrUrl
     ) {
+        return addOrReplaceDocument(actor, teacherId, fileName, type, sourcePathOrUrl, null);
+    }
+
+    public synchronized TeacherDocument addOrReplaceDocument(
+            String actor,
+            long teacherId,
+            String fileName,
+            String type,
+            String sourcePathOrUrl,
+            Double declaredDurationSeconds
+    ) {
         String role = userRole(actor);
         boolean isStaffOrAdmin = "STAFF".equals(role) || "ADMIN".equals(role);
         boolean isOwner = "TEACHER".equals(role) && teacherIdForUser(actor) == teacherId;
         if (!isStaffOrAdmin && !isOwner) {
+            lastValidationError = "Access denied: you are not authorized to upload documents for this teacher.";
             return null;
         }
         TeacherProfile teacher = teacher(teacherId);
-        if (teacher == null || fileName == null || fileName.isBlank() || type == null || type.isBlank()) {
+        if (teacher == null || type == null || type.isBlank()) {
+            lastValidationError = "Missing teacher profile or document category.";
             return null;
         }
+        String catKey = normalizeDocCategoryKey(type);
+        boolean isVideoCat = VideoValidator.isVideoCategoryKey(catKey);
+        String canonicalType = "teaching_video".equals(catKey) ? "Teaching video"
+                : ("intro_video".equals(catKey) ? "Intro video" : type.trim());
+
         String storedLocation = sourcePathOrUrl == null ? "" : sourcePathOrUrl.trim();
+        String effectiveFileName = fileName == null ? "" : fileName.trim();
+
+        if (isVideoCat) {
+            if (storedLocation.startsWith("http://") || storedLocation.startsWith("https://")
+                    || VideoValidator.isGoogleDriveUrl(storedLocation)) {
+                VideoValidator.ValidationResult vr = VideoValidator.validateGoogleDriveVideoLink(
+                        storedLocation, catKey, declaredDurationSeconds
+                );
+                if (!vr.valid()) {
+                    lastValidationError = vr.errorMessage();
+                    return null;
+                }
+                storedLocation = vr.normalizedLocation();
+                if (effectiveFileName.isEmpty()) {
+                    String fid = VideoValidator.extractGoogleDriveFileId(storedLocation);
+                    effectiveFileName = ("intro_video".equals(catKey) ? "Intro_Video_Drive_" : "Teaching_Video_Drive_")
+                            + (fid != null ? fid : "Link") + ".mp4";
+                }
+            } else {
+                Path src = null;
+                if (!storedLocation.isEmpty()) {
+                    try {
+                        src = storedLocation.startsWith("file:")
+                                ? Paths.get(java.net.URI.create(storedLocation))
+                                : Paths.get(storedLocation);
+                    } catch (Exception ignored) {
+                    }
+                }
+                if (src == null || !Files.isRegularFile(src)) {
+                    lastValidationError = "Please select a valid local video file (.mp4/.mov/.m4v) or paste a valid Google Drive video link.";
+                    return null;
+                }
+                String lowerName = src.getFileName() != null ? src.getFileName().toString().toLowerCase(Locale.ROOT) : "";
+                if (!lowerName.endsWith(".html") && !lowerName.endsWith(".htm")) {
+                    VideoValidator.ValidationResult vr = VideoValidator.validateLocalVideoFile(src, catKey);
+                    if (!vr.valid()) {
+                        lastValidationError = vr.errorMessage();
+                        return null;
+                    }
+                }
+                if (effectiveFileName.isEmpty() && src.getFileName() != null) {
+                    effectiveFileName = src.getFileName().toString();
+                }
+            }
+        } else {
+            if (effectiveFileName.isEmpty()) {
+                lastValidationError = "Document file name is required.";
+                return null;
+            }
+        }
+
         Path copiedLocalFile = null;
-        String safeFileName = fileName.trim().replaceAll("[^a-zA-Z0-9._-]", "_");
+        String safeFileName = effectiveFileName.replaceAll("[^a-zA-Z0-9._-]", "_");
         if (!storedLocation.isEmpty() && !storedLocation.startsWith("http://") && !storedLocation.startsWith("https://")) {
             try {
                 Path src = storedLocation.startsWith("file:")
                         ? Paths.get(java.net.URI.create(storedLocation))
                         : Paths.get(storedLocation);
                 if (Files.isRegularFile(src)) {
+                    long fLen = Files.size(src);
+                    if (fLen >= VideoValidator.MAX_VIDEO_FILE_BYTES) {
+                        lastValidationError = String.format(
+                                Locale.US,
+                                "File size (%.1f MB) reaches or exceeds the 100 MB upload limit. Please upload your video to Google Drive and paste the Google Drive link instead.",
+                                fLen / (1024.0 * 1024.0)
+                        );
+                        return null;
+                    }
                     Path targetDir = getDataDir().resolve("documents").resolve(Long.toString(teacherId));
                     Files.createDirectories(targetDir);
                     Path dest = targetDir.resolve(safeFileName);
@@ -1442,15 +1590,16 @@ public class PortalStore {
             }
         }
         if (storedLocation.isEmpty()) {
-            storedLocation = fileName.trim();
+            storedLocation = effectiveFileName;
         }
 
+        lastValidationError = "";
         String updatedDate = LocalDate.now().format(UPDATED_DATE_FORMAT);
         TeacherDocument doc = new TeacherDocument(
                 documentIds.incrementAndGet(),
                 teacherId,
-                fileName.trim(),
-                type.trim(),
+                effectiveFileName,
+                canonicalType,
                 updatedDate,
                 storedLocation
         );
@@ -1480,9 +1629,9 @@ public class PortalStore {
             } catch (Exception ignored) {
             }
             if (cloudSync != null && cloudSync.isEnabled()) {
-                String catKey = "doc:" + teacherId + ":" + normalizeDocCategoryKey(type);
-                cloudSync.uploadSharedFile(catKey, teacherId, safeFileName, copiedLocalFile);
-                cloudSync.uploadSharedFile(catKey + ":" + safeFileName, teacherId, safeFileName, copiedLocalFile);
+                String syncCatKey = "doc:" + teacherId + ":" + normalizeDocCategoryKey(type);
+                cloudSync.uploadSharedFile(syncCatKey, teacherId, safeFileName, copiedLocalFile);
+                cloudSync.uploadSharedFile(syncCatKey + ":" + safeFileName, teacherId, safeFileName, copiedLocalFile);
             }
         }
 
@@ -1513,10 +1662,27 @@ public class PortalStore {
         if ("intro_video".equals(cat) || "teaching_video".equals(cat) || cat.contains("video")) {
             return true;
         }
+        if (VideoValidator.isGoogleDriveUrl(doc.location())) {
+            return true;
+        }
         String fn = doc.fileName() == null ? "" : doc.fileName().toLowerCase(Locale.ROOT);
         String loc = doc.location() == null ? "" : doc.location().toLowerCase(Locale.ROOT);
-        return fn.endsWith(".mp4") || fn.endsWith(".webm") || fn.endsWith(".mov") || fn.endsWith(".mkv") || fn.endsWith(".avi")
-                || loc.endsWith(".mp4") || loc.endsWith(".webm") || loc.endsWith(".mov") || loc.endsWith(".mkv") || loc.endsWith(".avi");
+        return fn.endsWith(".mp4") || fn.endsWith(".m4v") || fn.endsWith(".webm") || fn.endsWith(".mov") || fn.endsWith(".mkv") || fn.endsWith(".avi")
+                || loc.endsWith(".mp4") || loc.endsWith(".m4v") || loc.endsWith(".webm") || loc.endsWith(".mov") || loc.endsWith(".mkv") || loc.endsWith(".avi");
+    }
+
+    public String getDocumentMimeType(TeacherDocument doc) {
+        if (doc == null) {
+            return "application/octet-stream";
+        }
+        String loc = doc.location() == null ? "" : doc.location().trim();
+        if (!loc.isEmpty()) {
+            String mime = VideoValidator.detectMimeType(loc);
+            if (!"application/octet-stream".equals(mime)) {
+                return mime;
+            }
+        }
+        return VideoValidator.detectMimeType(doc.fileName());
     }
 
     public synchronized TeacherDocument findBestVideoDocument(long teacherId, String preferredType) {
@@ -1753,8 +1919,119 @@ public class PortalStore {
         if (overlaps) {
             return false;
         }
+        String ivConflict = checkInterviewConflict(-1L, teacherId, null, startAt, endAt);
+        if (ivConflict != null) {
+            lastValidationError = ivConflict;
+            return false;
+        }
         availabilitySlots.add(new AvailabilitySlot(availabilityIds.incrementAndGet(), teacherId, startAt, endAt));
+        lastValidationError = "";
         log(username, "Added availability slot " + startAt + " - " + endAt);
+        saveState();
+        return true;
+    }
+
+    public record TimeSlotSpec(LocalDate date, LocalTime startTime, LocalTime endTime) {
+        public static TimeSlotSpec of(LocalDate date, LocalTime startTime, LocalTime endTime) {
+            return new TimeSlotSpec(date, startTime, endTime);
+        }
+
+        public static TimeSlotSpec of(LocalDateTime startAt, LocalDateTime endAt) {
+            if (startAt == null || endAt == null) {
+                return new TimeSlotSpec(null, null, null);
+            }
+            return new TimeSlotSpec(startAt.toLocalDate(), startAt.toLocalTime(), endAt.toLocalTime());
+        }
+
+        public LocalDateTime startAt() {
+            return (date != null && startTime != null) ? LocalDateTime.of(date, startTime) : null;
+        }
+
+        public LocalDateTime endAt() {
+            return (date != null && endTime != null) ? LocalDateTime.of(date, endTime) : null;
+        }
+
+        public String serializedPair() {
+            LocalDateTime s = startAt();
+            LocalDateTime e = endAt();
+            return (s != null && e != null) ? (s + "|" + e) : "";
+        }
+
+        public String displayLabel() {
+            LocalDateTime s = startAt();
+            LocalDateTime e = endAt();
+            return (s != null && e != null) ? CatalogData.formatInterviewTimeRange(s.toString(), e.toString()) : "";
+        }
+    }
+
+    public synchronized boolean addAvailabilitySlotsBatch(
+            String username,
+            long teacherId,
+            List<TimeSlotSpec> slotSpecs
+    ) {
+        String role = userRole(username);
+        boolean allowed = ("TEACHER".equals(role) && teacherIdForUser(username) == teacherId)
+                || "STAFF".equals(role) || "ADMIN".equals(role);
+        if (!allowed) {
+            lastValidationError = "Access denied: not authorized to modify availability slots for this teacher.";
+            return false;
+        }
+        if (slotSpecs == null || slotSpecs.isEmpty()) {
+            lastValidationError = "Please add at least one time slot before saving.";
+            return false;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        for (int i = 0; i < slotSpecs.size(); i++) {
+            TimeSlotSpec spec = slotSpecs.get(i);
+            if (spec == null || spec.date() == null || spec.startTime() == null || spec.endTime() == null) {
+                lastValidationError = "Slot #" + (i + 1) + " is missing date, start time, or end time.";
+                return false;
+            }
+            if (!spec.date().equals(spec.startAt().toLocalDate()) || !spec.endAt().isAfter(spec.startAt())) {
+                lastValidationError = "Invalid time range in slot #" + (i + 1) + ": end time must be after start time.";
+                return false;
+            }
+            if (!spec.startAt().isAfter(now)) {
+                lastValidationError = "Invalid slot #" + (i + 1) + ": start time must be in the future.";
+                return false;
+            }
+        }
+        for (int i = 0; i < slotSpecs.size(); i++) {
+            TimeSlotSpec a = slotSpecs.get(i);
+            for (int j = i + 1; j < slotSpecs.size(); j++) {
+                TimeSlotSpec b = slotSpecs.get(j);
+                if (a.startAt().isBefore(b.endAt()) && a.endAt().isAfter(b.startAt())) {
+                    lastValidationError = "Overlapping slots within the same setup: "
+                            + a.displayLabel() + " conflicts with " + b.displayLabel();
+                    return false;
+                }
+            }
+        }
+        for (TimeSlotSpec spec : slotSpecs) {
+            LocalDateTime s = spec.startAt();
+            LocalDateTime e = spec.endAt();
+            boolean overlapsExisting = availabilitySlots.stream().anyMatch(slot -> slot.teacherId() == teacherId
+                    && s.isBefore(slot.endAt()) && e.isAfter(slot.startAt()));
+            if (overlapsExisting) {
+                lastValidationError = "Schedule conflict: slot " + spec.displayLabel() + " overlaps with an existing availability slot.";
+                return false;
+            }
+            String ivConflict = checkInterviewConflict(-1L, teacherId, null, s, e);
+            if (ivConflict != null) {
+                lastValidationError = ivConflict;
+                return false;
+            }
+        }
+        for (TimeSlotSpec spec : slotSpecs) {
+            availabilitySlots.add(new AvailabilitySlot(
+                    availabilityIds.incrementAndGet(),
+                    teacherId,
+                    spec.startAt(),
+                    spec.endAt()
+            ));
+        }
+        lastValidationError = "";
+        log(username, "Added " + slotSpecs.size() + " availability slot(s) for teacher #" + teacherId);
         saveState();
         return true;
     }
@@ -1776,12 +2053,46 @@ public class PortalStore {
         return true;
     }
 
+    private void autoGrantReadyTeacherToActivePartners(long teacherId, boolean clearRevoked) {
+        String suffix = ":" + teacherId;
+        if (clearRevoked) {
+            revoked.removeIf(entry -> entry != null && entry.endsWith(suffix));
+        }
+        for (AppUser u : users.values()) {
+            if (u != null && u.isActive() && "PARTNER".equals(u.getRole())) {
+                String key = u.getUsername() + suffix;
+                if (!revoked.contains(key)) {
+                    granted.add(key);
+                }
+            }
+        }
+    }
+
+    private void ensureReadyGrantsForPartner(String partnerUsername) {
+        if (partnerUsername == null || partnerUsername.isBlank()) {
+            return;
+        }
+        AppUser u = users.get(partnerUsername.trim());
+        if (u == null || !u.isActive() || !"PARTNER".equals(u.getRole())) {
+            return;
+        }
+        for (TeacherProfile t : teachers) {
+            if ("READY".equalsIgnoreCase(CatalogData.normalizeStatusCode(t.getStatus()))) {
+                String key = u.getUsername() + ":" + t.getId();
+                if (!revoked.contains(key)) {
+                    granted.add(key);
+                }
+            }
+        }
+    }
+
     public synchronized List<TeacherProfile> visibleTeachers(String username, String role) {
         String authenticatedRole = userRole(username);
         if ("STAFF".equals(authenticatedRole) || "ADMIN".equals(authenticatedRole)) {
             return List.copyOf(teachers);
         }
         if ("PARTNER".equals(authenticatedRole)) {
+            ensureReadyGrantsForPartner(username);
             return teachers.stream()
                     .filter(teacher -> granted.contains(username + ":" + teacher.getId()))
                     .toList();
@@ -1799,10 +2110,15 @@ public class PortalStore {
         if (teacher(teacherId) == null) {
             return false;
         }
+        ensureReadyGrantsForPartner(username);
         return granted.contains(username + ":" + teacherId);
     }
 
     public synchronized int countPartnersGrantedForTeacher(long teacherId) {
+        TeacherProfile tp = teacher(teacherId);
+        if (tp != null && "READY".equalsIgnoreCase(CatalogData.normalizeStatusCode(tp.getStatus()))) {
+            autoGrantReadyTeacherToActivePartners(teacherId, false);
+        }
         String suffix = ":" + teacherId;
         int count = 0;
         for (String entry : granted) {
@@ -1822,7 +2138,9 @@ public class PortalStore {
                 || !"PARTNER".equals(userRole(username)) || teacher(teacherId) == null) {
             return false;
         }
-        granted.add(username + ":" + teacherId);
+        String key = username + ":" + teacherId;
+        revoked.remove(key);
+        granted.add(key);
         log(actor, "Granted teacher " + teacherId + " to " + username);
         saveState();
         return true;
@@ -1837,11 +2155,13 @@ public class PortalStore {
                 || !"PARTNER".equals(userRole(username))) {
             return false;
         }
-        boolean removed = granted.remove(username + ":" + teacherId);
+        String key = username + ":" + teacherId;
+        revoked.add(key);
+        boolean removed = granted.remove(key);
         if (removed) {
             log(actor, "Revoked teacher " + teacherId + " from " + username);
-            saveState();
         }
+        saveState();
         return removed;
     }
 
@@ -1902,6 +2222,10 @@ public class PortalStore {
             return false;
         }
         teacher.setStatus(normalized);
+        if ("READY".equalsIgnoreCase(normalized)) {
+            autoGrantReadyTeacherToActivePartners(teacher.getId(), true);
+        }
+        teacher.setUpdatedAt(nowUtc7String());
         log(actor, "Updated " + teacher.getName() + " status to " + normalized);
         saveState();
         return true;
@@ -2104,6 +2428,223 @@ public class PortalStore {
                         + ") was rescheduled by " + actor + " to " + formattedSlot
         );
         log(actor, "Rescheduled interview #" + interviewId + " to " + formattedSlot);
+        saveState();
+        return true;
+    }
+
+    public synchronized boolean requestInterviewsBatch(
+            long teacherId,
+            String partnerUsername,
+            List<TimeSlotSpec> slotSpecs
+    ) {
+        TeacherProfile teacher = teacher(teacherId);
+        AppUser partner = partnerUsername == null ? null : users.get(partnerUsername);
+        if (teacher == null || partner == null || !"PARTNER".equals(partner.getRole())
+                || !canPartnerAccessTeacher(partnerUsername, teacherId)) {
+            lastValidationError = "Access denied: Partner cannot book interviews for this teacher.";
+            return false;
+        }
+        if (slotSpecs == null || slotSpecs.isEmpty()) {
+            lastValidationError = "Please add at least one interview time slot before saving.";
+            return false;
+        }
+        String partnerName = (partner.getFullName() == null || partner.getFullName().isBlank())
+                ? partner.getUsername() : partner.getFullName();
+        LocalDateTime now = LocalDateTime.now();
+        for (int i = 0; i < slotSpecs.size(); i++) {
+            TimeSlotSpec spec = slotSpecs.get(i);
+            if (spec == null || spec.date() == null || spec.startTime() == null || spec.endTime() == null) {
+                lastValidationError = "Slot #" + (i + 1) + " is missing date, start time, or end time.";
+                return false;
+            }
+            if (!spec.endAt().isAfter(spec.startAt())) {
+                lastValidationError = "Invalid time range in slot #" + (i + 1) + ": end time must be after start time.";
+                return false;
+            }
+            if (!spec.startAt().isAfter(now)) {
+                lastValidationError = "Slot #" + (i + 1) + " must be scheduled in the future.";
+                return false;
+            }
+        }
+        for (int i = 0; i < slotSpecs.size(); i++) {
+            TimeSlotSpec a = slotSpecs.get(i);
+            for (int j = i + 1; j < slotSpecs.size(); j++) {
+                TimeSlotSpec b = slotSpecs.get(j);
+                if (a.startAt().isBefore(b.endAt()) && a.endAt().isAfter(b.startAt())) {
+                    lastValidationError = "Overlapping slots within the same setup: "
+                            + a.displayLabel() + " conflicts with " + b.displayLabel();
+                    return false;
+                }
+            }
+        }
+        for (TimeSlotSpec spec : slotSpecs) {
+            String conflict = checkInterviewConflict(-1L, teacherId, partnerName, spec.startAt(), spec.endAt());
+            if (conflict != null) {
+                lastValidationError = conflict;
+                return false;
+            }
+        }
+        List<String> serializedBatch = slotSpecs.stream().map(TimeSlotSpec::serializedPair).toList();
+        for (TimeSlotSpec spec : slotSpecs) {
+            String startIso = spec.startAt().toString();
+            String endIso = spec.endAt().toString();
+            long newId = interviewIds.incrementAndGet();
+            String autoMeetUrl = generateMeetingLink(newId, teacher.getName(), partnerName, startIso);
+            Interview interview = new Interview(
+                    newId,
+                    teacherId,
+                    teacher.getName(),
+                    partnerName,
+                    startIso,
+                    endIso,
+                    "PENDING",
+                    "Not reviewed",
+                    "",
+                    autoMeetUrl
+            );
+            interview.setProposedSlots(serializedBatch);
+            interviews.add(interview);
+            availabilitySlots.removeIf(slot -> slot.teacherId() == teacherId && slot.startAt().equals(spec.startAt()));
+            addNotification(
+                    "BOTH",
+                    "",
+                    teacherId,
+                    partnerName,
+                    "INTERVIEW_SCHEDULED",
+                    "New Interview Scheduled",
+                    "Interview #" + newId + " scheduled for " + teacher.getName() + " with " + partnerName
+                            + " at " + CatalogData.formatInterviewTimeRange(startIso, endIso)
+            );
+        }
+        lastValidationError = "";
+        log(partnerUsername, "Scheduled " + slotSpecs.size() + " interview slot(s) for " + teacher.getName());
+        saveState();
+        return true;
+    }
+
+    public synchronized boolean rescheduleInterviewMultiSlots(
+            String actor,
+            long interviewId,
+            List<TimeSlotSpec> slotSpecs
+    ) {
+        Interview interview = findInterview(interviewId);
+        if (interview == null) {
+            lastValidationError = "Interview not found.";
+            return false;
+        }
+        String role = userRole(actor);
+        boolean isStaffOrAdmin = "STAFF".equals(role) || "ADMIN".equals(role);
+        boolean isPartnerOwner = "PARTNER".equals(role) && isSamePartner(interview.getPartner(), actor);
+        if (!isStaffOrAdmin && !isPartnerOwner) {
+            lastValidationError = "Access denied: role is not authorized to reschedule this interview.";
+            return false;
+        }
+        if (slotSpecs == null || slotSpecs.isEmpty()) {
+            lastValidationError = "Please add at least one time slot before saving.";
+            return false;
+        }
+        for (int i = 0; i < slotSpecs.size(); i++) {
+            TimeSlotSpec spec = slotSpecs.get(i);
+            if (spec == null || spec.date() == null || spec.startTime() == null || spec.endTime() == null) {
+                lastValidationError = "Slot #" + (i + 1) + " is missing date, start time, or end time.";
+                return false;
+            }
+            if (!spec.endAt().isAfter(spec.startAt())) {
+                lastValidationError = "Invalid time range in slot #" + (i + 1) + ": end time must be after start time.";
+                return false;
+            }
+        }
+        for (int i = 0; i < slotSpecs.size(); i++) {
+            TimeSlotSpec a = slotSpecs.get(i);
+            for (int j = i + 1; j < slotSpecs.size(); j++) {
+                TimeSlotSpec b = slotSpecs.get(j);
+                if (a.startAt().isBefore(b.endAt()) && a.endAt().isAfter(b.startAt())) {
+                    lastValidationError = "Overlapping slots within the same setup: "
+                            + a.displayLabel() + " conflicts with " + b.displayLabel();
+                    return false;
+                }
+            }
+        }
+        for (TimeSlotSpec spec : slotSpecs) {
+            String conflict = checkInterviewConflict(
+                    interviewId,
+                    interview.getTeacherId(),
+                    interview.getPartner(),
+                    spec.startAt(),
+                    spec.endAt()
+            );
+            if (conflict != null) {
+                lastValidationError = conflict;
+                return false;
+            }
+        }
+
+        TimeSlotSpec primary = slotSpecs.get(0);
+        interview.setDateTime(primary.startAt().toString());
+        interview.setEndDateTime(primary.endAt().toString());
+        List<String> serialized = slotSpecs.stream().map(TimeSlotSpec::serializedPair).toList();
+        interview.setProposedSlots(serialized);
+
+        lastValidationError = "";
+        String formattedPrimary = CatalogData.formatInterviewTimeRange(interview.getDateTime(), interview.getEndDateTime());
+        String extraInfo = slotSpecs.size() > 1 ? " (+" + (slotSpecs.size() - 1) + " additional option slot(s))" : "";
+        addNotification(
+                "BOTH",
+                "",
+                interview.getTeacherId(),
+                interview.getPartner(),
+                "INTERVIEW_RESCHEDULED",
+                "Interview Schedule Updated",
+                "Interview #" + interview.getId() + " (" + interview.getTeacherName() + " · " + interview.getPartner()
+                        + ") was updated by " + actor + " with " + slotSpecs.size() + " slot(s): " + formattedPrimary + extraInfo
+        );
+        log(actor, "Updated interview #" + interviewId + " with " + slotSpecs.size() + " slot(s): " + formattedPrimary);
+        saveState();
+        return true;
+    }
+
+    public synchronized boolean confirmInterviewSlot(
+            String actor,
+            long interviewId,
+            String selectedSlotPair
+    ) {
+        Interview interview = findInterview(interviewId);
+        if (interview == null) {
+            lastValidationError = "Interview not found.";
+            return false;
+        }
+        String role = userRole(actor);
+        boolean isStaffOrAdmin = "STAFF".equals(role) || "ADMIN".equals(role);
+        boolean isTeacherOwner = "TEACHER".equals(role) && teacherIdForUser(actor) == interview.getTeacherId();
+        if (!isStaffOrAdmin && !isTeacherOwner) {
+            lastValidationError = "Access denied: not authorized to confirm this interview.";
+            return false;
+        }
+        if (selectedSlotPair != null && !selectedSlotPair.isBlank() && selectedSlotPair.contains("|")) {
+            int sep = selectedSlotPair.indexOf("|");
+            String startRaw = selectedSlotPair.substring(0, sep).trim();
+            String endRaw = selectedSlotPair.substring(sep + 1).trim();
+            LocalDateTime s = parseInterviewStart(startRaw);
+            LocalDateTime e = parseInterviewStart(endRaw);
+            if (s == null || e == null || !e.isAfter(s)) {
+                lastValidationError = "Selected interview slot has an invalid time range.";
+                return false;
+            }
+            String conflict = checkInterviewConflict(interviewId, interview.getTeacherId(), interview.getPartner(), s, e);
+            if (conflict != null) {
+                lastValidationError = conflict;
+                return false;
+            }
+            interview.setDateTime(s.toString());
+            interview.setEndDateTime(e.toString());
+        }
+        interview.setStatus("CONFIRMED");
+        if (interview.getMeetingUrl() == null || interview.getMeetingUrl().isBlank()) {
+            interview.setMeetingUrl(generateMeetingLink(interview));
+        }
+        lastValidationError = "";
+        log(actor, "Confirmed interview #" + interviewId + " at "
+                + CatalogData.formatInterviewTimeRange(interview.getDateTime(), interview.getEndDateTime()));
         saveState();
         return true;
     }
@@ -2393,11 +2934,29 @@ public class PortalStore {
         if (simulatedReloadError != null && !simulatedReloadError.isBlank()) {
             return new ReloadResult(false, "ERROR", simulatedReloadError, ts);
         }
+        Path stateFile = getStateFilePath();
+        if (Files.isRegularFile(stateFile)) {
+            Properties diskProps = readPropertiesFromFile(stateFile);
+            if (diskProps != null) {
+                long diskTs = parseLong(diskProps.getProperty("state.lastModifiedMs"), 0L);
+                if (diskTs > this.lastModifiedMs) {
+                    loadFromProperties(diskProps);
+                }
+            }
+        }
         if (cloudSync != null && cloudSync.isEnabled()) {
             Properties remoteProps = cloudSync.pullProperties();
-            if (remoteProps != null && loadFromProperties(remoteProps)) {
-                saveLocalOnly();
-                return new ReloadResult(true, "CLOUD", "Reloaded latest data from cloud & local storage.", ts);
+            if (remoteProps != null) {
+                long remoteTs = parseLong(remoteProps.getProperty("state.lastModifiedMs"), 0L);
+                if (remoteTs > 0L && this.lastModifiedMs > remoteTs) {
+                    cloudSync.pushProperties(toProperties());
+                    saveLocalOnly();
+                    return new ReloadResult(true, "CLOUD", "Synced latest local state to cloud & storage.", ts);
+                }
+                if (loadFromProperties(remoteProps)) {
+                    saveLocalOnly();
+                    return new ReloadResult(true, "CLOUD", "Reloaded latest data from cloud & local storage.", ts);
+                }
             }
             String cloudErr = cloudSync.getLastError();
             if (cloudErr != null && !cloudErr.isBlank()) {
@@ -2408,7 +2967,6 @@ public class PortalStore {
                 return new ReloadResult(false, "CLOUD_ERROR", "Cloud sync failed: " + cloudErr, ts);
             }
         }
-        Path stateFile = getStateFilePath();
         if (Files.isRegularFile(stateFile)) {
             if (loadFromDisk(stateFile)) {
                 return new ReloadResult(true, "LOCAL_DISK", "Reloaded latest data from local storage.", ts);

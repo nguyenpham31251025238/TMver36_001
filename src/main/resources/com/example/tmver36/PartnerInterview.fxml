@@ -164,9 +164,14 @@
                           </VBox>
                           <VBox alignment="BOTTOM_LEFT" spacing="7">
                             <Label styleClass="field-label" text=" " />
-                            <Button fx:id="rescheduleInterviewButton" styleClass="secondary" text="Reschedule Selected Interview" />
+                            <HBox spacing="8">
+                              <Button fx:id="addDraftSlotButton" styleClass="secondary" text="+ Add Slot to List" />
+                              <Button fx:id="saveMultiSlotsButton" styleClass="primary" text="Save All Slots" />
+                              <Button fx:id="rescheduleInterviewButton" styleClass="secondary" text="Reschedule Selected Interview" />
+                            </HBox>
                           </VBox>
                         </HBox>
+                        <VBox fx:id="draftSlotsBox" spacing="6" />
                       </VBox>
                       <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
                         <Label styleClass="section-title" text="Track requests &amp; official results" />

@@ -90,7 +90,7 @@
                     <Button fx:id="reviewCvButton" styleClass="button-sm,secondary" text="Open CV" />
                     <Button fx:id="reviewCertButton" styleClass="button-sm,secondary" text="Open Certificate" />
                     <Button fx:id="reviewIntroButton" styleClass="button-sm,secondary" text="Watch Intro Video" />
-                    <Button fx:id="reviewDemoButton" styleClass="button-sm,secondary" text="Watch Demo Video" />
+                    <Button fx:id="reviewDemoButton" styleClass="button-sm,secondary" text="Watch Teaching Video" />
                   </HBox>
 
                   <!-- Dynamic Document Table populated from STORE.documents(teacherId) -->
@@ -119,7 +119,7 @@
                   <CheckBox fx:id="checkPersonalInfo" text="Complete personal information &amp; degree/major" />
                   <CheckBox fx:id="checkReadableCv" text="Readable and consistent CV" />
                   <CheckBox fx:id="checkCertificates" text="Viewable teaching certificates" />
-                  <CheckBox fx:id="checkVideos" text="Viewable intro / teaching demo video" />
+                  <CheckBox fx:id="checkVideos" text="Viewable intro / teaching video" />
                   <CheckBox fx:id="checkScheduleSlots" text="Declared interview availability slots" />
 
                   <VBox spacing="6">

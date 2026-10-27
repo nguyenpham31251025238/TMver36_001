@@ -97,6 +97,7 @@ public class PartnerDashboardController {
             });
         }
 
+        STORE.syncFromCloud();
         applySearch();
     }
 

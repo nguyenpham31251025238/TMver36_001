@@ -82,10 +82,10 @@
                   <Label styleClass="section-title" text="Video &amp; Verified Documents" />
                   <VBox alignment="CENTER" minHeight="180" spacing="12" styleClass="video-panel">
                     <Label fx:id="videoInitialsLabel" alignment="CENTER" styleClass="video-initial" text="EM" />
-                    <Label styleClass="video-caption" text="CANDIDATE INTRO &amp; TEACHING DEMO VIDEO" />
+                    <Label styleClass="video-caption" text="CANDIDATE INTRO &amp; TEACHING VIDEO" />
                     <HBox alignment="CENTER" spacing="10">
                       <Button fx:id="playIntroButton" styleClass="primary" text="Watch intro video" />
-                      <Button fx:id="partnerDemoButton" styleClass="secondary" text="Watch teaching demo" />
+                      <Button fx:id="partnerDemoButton" styleClass="secondary" text="Watch teaching video" />
                     </HBox>
                   </VBox>
 

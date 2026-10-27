@@ -138,9 +138,14 @@
                           </VBox>
                           <VBox alignment="BOTTOM_LEFT" spacing="7">
                             <Label styleClass="field-label" text=" " />
-                            <Button fx:id="rescheduleInterviewButton" styleClass="secondary" text="Reschedule Time Slot" />
+                            <HBox spacing="8">
+                              <Button fx:id="addDraftSlotButton" styleClass="secondary" text="+ Add Slot to List" />
+                              <Button fx:id="saveMultiSlotsButton" styleClass="primary" text="Save All Slots" />
+                              <Button fx:id="rescheduleInterviewButton" styleClass="secondary" text="Reschedule Time Slot" />
+                            </HBox>
                           </VBox>
                         </HBox>
+                        <VBox fx:id="draftSlotsBox" spacing="6" />
                         <Label maxWidth="Infinity" styleClass="note" text="Time adjustments automatically verify there are no overlapping interviews for either the teacher or the partner." wrapText="true" />
                         <HBox alignment="CENTER_LEFT" spacing="12">
                           <Button fx:id="createMeetButton" styleClass="secondary" text="Create Meet room (integrated)" />

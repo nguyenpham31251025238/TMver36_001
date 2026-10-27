@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Emily Martin — Classroom Teaching Demo Video</title>
+<title>Emily Martin — Classroom Teaching Video</title>
 <style>
   body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 32px; display: flex; justify-content: center; }
   .container { max-width: 860px; width: 100%; background: #1e293b; border-radius: 16px; padding: 28px; box-shadow: 0 20px 50px rgba(0,0,0,0.45); border: 1px solid #334155; }
@@ -23,7 +23,7 @@
 <body>
   <div class="container">
     <span class="badge">TEACHERMATCH VERIFIED MEDIA · 14:40</span>
-    <h1>Emily Martin — Classroom Teaching Demo Video</h1>
+    <h1>Emily Martin — Classroom Teaching Video</h1>
     <div class="sub">United Kingdom · Grade 3 Cambridge Primary Phonics & Speaking Demo</div>
     <div class="player">
       <button class="play-btn" id="btn" onclick="togglePlay()">▶</button>
@@ -44,7 +44,7 @@
     playing = !playing;
     if (playing) {
       btn.textContent = '⏸';
-      st.textContent = 'Playing verified HD stream — Emily Martin (Classroom Teaching Demo Video)...';
+      st.textContent = 'Playing verified HD stream — Emily Martin (Classroom Teaching Video)...';
       timer = setInterval(() => {
         pct = (pct + 2) % 102;
         bar.style.width = Math.min(pct, 100) + '%';

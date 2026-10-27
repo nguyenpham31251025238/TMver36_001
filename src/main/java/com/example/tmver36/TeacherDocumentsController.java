@@ -3,6 +3,7 @@ package com.example.tmver36;
 import com.example.tmver36.model.TeacherDocument;
 import com.example.tmver36.model.TeacherProfile;
 import com.example.tmver36.service.PortalStore;
+import com.example.tmver36.service.VideoValidator;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -39,6 +40,7 @@ public class TeacherDocumentsController {
     @FXML private TextField documentName;
     @FXML private Button chooseFileButton;
     @FXML private TextField documentUrl;
+    @FXML private TextField videoDurationField;
     @FXML private Button addDocumentButton;
     @FXML private Label uploadStatusLabel;
     @FXML private Button viewCvButton;
@@ -115,15 +117,60 @@ public class TeacherDocumentsController {
         );
         chosenFile = chooser.showOpenDialog(window);
         if (chosenFile != null) {
-            if (documentName != null && (documentName.getText() == null || documentName.getText().isBlank())) {
-                documentName.setText(chosenFile.getName());
-            }
-            if (documentUrl != null) {
-                documentUrl.setText(chosenFile.getAbsolutePath());
-            }
+            handleSelectedLocalFile(chosenFile);
+        }
+    }
+
+    public boolean handleSelectedLocalFile(File file) {
+        if (file == null) return false;
+        long len = file.length();
+        if (len >= VideoValidator.MAX_VIDEO_FILE_BYTES) {
+            String msg = String.format(
+                    Locale.US,
+                    "File size (%.1f MB) reaches or exceeds the 100 MB upload limit. Please upload your video to Google Drive and paste the Google Drive link in the URL field instead.",
+                    len / (1024.0 * 1024.0)
+            );
+            chosenFile = null;
             if (uploadStatusLabel != null) {
-                uploadStatusLabel.setText("Selected file: " + chosenFile.getName() + " (" + (chosenFile.length() / 1024 + 1) + " KB). Click 'Save & Upload Document' to attach.");
+                uploadStatusLabel.setText(msg);
             }
+            showError("File Exceeds 100 MB Limit", msg);
+            return false;
+        }
+        chosenFile = file;
+        if (documentName != null && (documentName.getText() == null || documentName.getText().isBlank())) {
+            documentName.setText(file.getName());
+        }
+        if (documentUrl != null) {
+            documentUrl.setText(file.getAbsolutePath());
+        }
+        try {
+            double dur = VideoValidator.extractMp4DurationSeconds(file.toPath());
+            if (dur > 0 && videoDurationField != null) {
+                videoDurationField.setText(String.format(Locale.US, "%.1f", dur));
+            }
+        } catch (Exception ignored) {
+        }
+        if (uploadStatusLabel != null) {
+            uploadStatusLabel.setText("Selected file: " + file.getName() + " (" + (file.length() / 1024 + 1) + " KB). Click 'Save & Upload Document' to attach.");
+        }
+        return true;
+    }
+
+    private Double parseEnteredVideoDurationSeconds() {
+        if (videoDurationField == null || videoDurationField.getText() == null) return null;
+        String raw = videoDurationField.getText().trim();
+        if (raw.isEmpty()) return null;
+        try {
+            if (raw.contains(":")) {
+                String[] parts = raw.split(":");
+                if (parts.length == 2) {
+                    return Integer.parseInt(parts[0].trim()) * 60.0 + Double.parseDouble(parts[1].trim());
+                }
+            }
+            return Double.parseDouble(raw.replaceAll("[^0-9.]", ""));
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -137,6 +184,10 @@ public class TeacherDocumentsController {
         if (name.isBlank() && chosenFile != null) {
             name = chosenFile.getName();
         }
+        if (name.isBlank() && VideoValidator.isGoogleDriveUrl(urlOrPath)) {
+            String driveId = VideoValidator.extractGoogleDriveFileId(urlOrPath);
+            name = type.replace(' ', '_') + "_Drive_" + (driveId != null ? driveId.substring(0, Math.min(8, driveId.length())) : "Link");
+        }
         if (type.isBlank() || (name.isBlank() && urlOrPath.isBlank())) {
             showError("Missing document details", "Select a document type, enter a name, and choose a file or provide a URL.");
             return;
@@ -149,13 +200,22 @@ public class TeacherDocumentsController {
         }
         String finalName = name.isBlank() ? urlOrPath : name;
         String finalLocation = urlOrPath.isBlank() ? finalName : urlOrPath;
-        TeacherDocument saved = STORE.addOrReplaceDocument(currentActor(), currentTeacherId(), finalName, type, finalLocation);
+        Double durationSec = parseEnteredVideoDurationSeconds();
+        TeacherDocument saved = STORE.addOrReplaceDocument(currentActor(), currentTeacherId(), finalName, type, finalLocation, durationSec);
         if (saved == null) {
-            showError("Save failed", "Could not save document to PortalStore.");
+            String err = STORE.getLastValidationError();
+            if (err == null || err.isBlank()) {
+                err = "Could not save document to PortalStore.";
+            }
+            if (uploadStatusLabel != null) {
+                uploadStatusLabel.setText(err);
+            }
+            showError("Upload / Validation Rejected", err);
             return;
         }
         if (documentName != null) documentName.clear();
         if (documentUrl != null) documentUrl.clear();
+        if (videoDurationField != null) videoDurationField.clear();
         chosenFile = null;
         if (uploadStatusLabel != null) {
             uploadStatusLabel.setText("Uploaded '" + saved.fileName() + "' (" + saved.type() + ") and synced to profile.");
