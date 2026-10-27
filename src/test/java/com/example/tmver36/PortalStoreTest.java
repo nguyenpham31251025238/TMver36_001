@@ -267,4 +267,139 @@ class PortalStoreTest {
             deviceA.resetToSeedData();
         }
     }
+
+    @Test
+    void reloadDataAvatarSyncAndVideoAuthPlaybackWork() throws Exception {
+        Path dir1 = tempDir.resolve("storeA");
+        PortalStore storeA = new PortalStore(dir1);
+
+        // Task 1: Reload latest data & error state handling
+        PortalStore.ReloadResult okReload = storeA.reloadLatestData();
+        assertNotNull(okReload);
+        assertTrue(okReload.success());
+        assertNotNull(okReload.timestamp());
+
+        storeA.setSimulatedReloadError("Simulated network timeout");
+        PortalStore.ReloadResult failReload = storeA.reloadLatestData();
+        assertFalse(failReload.success());
+        assertTrue(failReload.message().contains("Simulated network timeout"));
+
+        // Task 2: Avatar update by Teacher persists base64 & file and restores even if local file is missing
+        Path customAvatar = tempDir.resolve("new_teacher_avatar.png");
+        byte[] samplePngBytes = java.util.Base64.getDecoder().decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII="
+        );
+        Files.write(customAvatar, samplePngBytes);
+        String storedAvatarPath = storeA.updateTeacherAvatar("teacher", 1L, customAvatar);
+        assertNotNull(storedAvatarPath);
+        assertFalse(storeA.teacher(1L).getAvatarBase64().isBlank(), "Avatar base64 must be stored for cross-role/session sync");
+
+        // Reload in another PortalStore instance and delete local path to test base64/shared restoration for Staff/Partner
+        PortalStore storeB = new PortalStore(dir1);
+        TeacherProfile emilyB = storeB.teacher(1L);
+        assertNotNull(emilyB);
+        assertEquals(storedAvatarPath, emilyB.getAvatarUrl());
+        Files.deleteIfExists(Path.of(storedAvatarPath));
+        Path restoredAvatar = storeB.resolveTeacherAvatarFile(emilyB);
+        assertNotNull(restoredAvatar, "Staff/Partner must resolve Teacher avatar from persisted store even if original file was removed");
+        assertTrue(Files.isRegularFile(restoredAvatar));
+
+        // Task 3: Salary, Nationality, and UTC+7 timestamp normalization & role access control
+        emilyB.setExpectedSalary("2200");
+        emilyB.setNationality("united kingdom");
+        assertFalse(storeB.saveTeacherProfile("partner", emilyB), "Partner must not be allowed to modify Teacher profile");
+        assertTrue(storeB.saveTeacherProfile("teacher", emilyB));
+        assertEquals("$2,200", storeB.teacher(1L).getExpectedSalary());
+        assertEquals("United Kingdom", storeB.teacher(1L).getNationality());
+        assertTrue(storeB.teacher(1L).getUpdatedAt().contains("UTC+7"));
+
+        // Task 10: Video upload, storage resolution, category lookup, and role-based authorization
+        Path customVideo = tempDir.resolve("demo_teaching_lesson.mp4");
+        Files.write(customVideo, new byte[]{0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x6d, 0x70, 0x34, 0x32});
+        TeacherDocument videoDoc = storeB.addOrReplaceDocument("teacher", 1L, "demo_teaching_lesson.mp4", "Intro video", customVideo.toString());
+        assertNotNull(videoDoc);
+        assertTrue(storeB.isVideoDocument(videoDoc));
+
+        TeacherDocument foundVideo = ProfileCardBuilder.findDocumentByCategory(storeB, 1L, "Intro video");
+        assertNotNull(foundVideo);
+        assertEquals(videoDoc.id(), foundVideo.id(), "Video lookup must return the video document, never fallback to PDF CV");
+
+        // Role authorization check for opening video:
+        assertTrue(storeB.canUserAccessDocument("teacher", foundVideo));
+        assertTrue(storeB.canUserAccessDocument("staff", foundVideo));
+        assertTrue(storeB.canUserAccessDocument("partner", foundVideo), "Partner granted access to Teacher 1 can view video");
+
+        // Revoke partner access -> Partner must be blocked from opening Teacher 1 video
+        storeB.revoke("staff", "partner", 1L);
+        assertFalse(storeB.canUserAccessDocument("partner", foundVideo), "Unshared Partner must be blocked from accessing Teacher video");
+        assertFalse(storeB.openDocument("partner", foundVideo), "openDocument must reject unauthorized Partner");
+        storeB.grant("staff", "partner", 1L);
+        assertTrue(storeB.canUserAccessDocument("partner", foundVideo));
+        assertNotNull(storeB.resolveDocumentLocalFile(foundVideo));
+    }
+
+    @Test
+    void interviewScheduleConflictDetectionConfigurableNotificationsAndStaffResultSyncWork() {
+        PortalStore store = new PortalStore(tempDir.resolve("schedule_notify"));
+
+        // Task 4: Shortlist toggle & filter matching
+        assertFalse(store.isTeacherShortlistedByPartner("partner", 2L));
+        assertTrue(store.togglePartnerShortlist("partner", 2L));
+        assertTrue(store.isTeacherShortlistedByPartner("partner", 2L));
+        assertTrue(CatalogData.matchesShortlistFilter(true, "Shortlisted"));
+        assertFalse(CatalogData.matchesShortlistFilter(true, "Not Shortlisted"));
+        assertTrue(CatalogData.matchesShortlistFilter(false, "Not Shortlisted"));
+
+        // Task 7: Interview reschedule & conflict detection
+        List<Interview> all = store.interviews();
+        assertFalse(all.isEmpty());
+        Interview first = all.get(0); // Teacher 1 (Emily Martin)
+        LocalDate targetDate = LocalDate.now().plusDays(2);
+        LocalDateTime slot1Start = LocalDateTime.of(targetDate, LocalTime.of(14, 0));
+        LocalDateTime slot1End = LocalDateTime.of(targetDate, LocalTime.of(14, 30));
+
+        // Staff reschedules interview #1
+        assertTrue(store.rescheduleInterview("staff", first.getId(), slot1Start, slot1End),
+                "Valid reschedule by Staff should succeed without conflict");
+        assertEquals(slot1Start.toString(), store.findInterview(first.getId()).getDateTime());
+
+        // Reschedule another interview to overlap with interview #1 -> must detect conflict!
+        Interview second = all.get(1);
+        assertFalse(store.rescheduleInterview("staff", second.getId(),
+                slot1Start.plusMinutes(10), slot1End.plusMinutes(10)),
+                "Overlapping interview for same teacher must be rejected");
+        assertTrue(store.getLastValidationError().toLowerCase().contains("conflict"));
+
+        // Unauthorized role cannot reschedule
+        assertFalse(store.rescheduleInterview("teacher", first.getId(),
+                slot1Start.plusHours(2), slot1End.plusHours(2)),
+                "Teacher role cannot arbitrarily reschedule interview slot");
+
+        // Task 8: Configurable lead-days notifications for Teacher and Partner
+        assertTrue(store.setNotificationLeadDays("staff", 3));
+        assertEquals(3, store.getNotificationLeadDays());
+        assertTrue(store.notificationsForUser("teacher").stream()
+                .anyMatch(n -> "INTERVIEW_REMINDER".equals(n.getCategory()) || "INTERVIEW_RESCHEDULED".equals(n.getCategory())),
+                "Teacher must receive upcoming interview reminder within configured 3 lead days");
+        assertTrue(store.notificationsForUser("partner").stream()
+                .anyMatch(n -> "INTERVIEW_REMINDER".equals(n.getCategory()) || "INTERVIEW_RESCHEDULED".equals(n.getCategory())),
+                "Partner must receive upcoming interview reminder within configured 3 lead days");
+
+        // Task 9: Staff updates interview result to Interview Successful -> syncs & notifies Teacher and Partner
+        assertFalse(store.updateInterviewResultByStaff("partner", first.getId(), "Interview Successful", "Attempt by partner"),
+                "Non-staff must not be able to call updateInterviewResultByStaff");
+        assertTrue(store.updateInterviewResultByStaff("staff", first.getId(), "Interview Successful", "Passed demo lesson with high score"));
+
+        Interview updated = store.findInterview(first.getId());
+        assertEquals("CONFIRMED", updated.getStatus());
+        assertEquals("Interview Successful", updated.getResult());
+        assertTrue(updated.getFeedback().contains("Passed demo lesson with high score"));
+
+        assertTrue(store.notificationsForUser("teacher").stream()
+                .anyMatch(n -> "INTERVIEW_RESULT".equals(n.getCategory()) && n.getMessage().contains("Interview Successful")),
+                "Teacher must be notified when Staff updates interview result");
+        assertTrue(store.notificationsForUser("partner").stream()
+                .anyMatch(n -> "INTERVIEW_RESULT".equals(n.getCategory()) && n.getMessage().contains("Interview Successful")),
+                "Partner must be notified when Staff updates interview result");
+    }
 }

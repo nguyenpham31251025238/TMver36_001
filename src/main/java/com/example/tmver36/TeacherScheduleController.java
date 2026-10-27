@@ -2,6 +2,7 @@ package com.example.tmver36;
 
 import com.example.tmver36.model.AvailabilitySlot;
 import com.example.tmver36.model.Interview;
+import com.example.tmver36.model.NotificationItem;
 import com.example.tmver36.model.TeacherProfile;
 import com.example.tmver36.service.PortalStore;
 import javafx.collections.FXCollections;
@@ -21,7 +22,6 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
-import java.awt.Desktop;
 import java.net.URI;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -33,7 +33,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * JavaFX controller for teacher availability and interview requests (TeacherSchedule.fxml).
+ * JavaFX controller for teacher availability, notifications, and interview requests (TeacherSchedule.fxml).
  */
 public class TeacherScheduleController {
 
@@ -45,6 +45,9 @@ public class TeacherScheduleController {
     @FXML private Button nav_TeacherSchedule;
     @FXML private Button nav_TeacherHistory;
     @FXML private Button nav_Login;
+
+    @FXML private ComboBox<Integer> leadDaysCombo;
+    @FXML private VBox teacherNotificationsBox;
 
     @FXML private DatePicker availabilityDate;
     @FXML private ComboBox<String> fromCombo;
@@ -81,6 +84,24 @@ public class TeacherScheduleController {
             locateControls(root);
             updateSidebarHeader(root);
         }
+        ProfileCardBuilder.decorateScreen(root, STORE, () -> {
+            if (root != null) updateSidebarHeader(root);
+            slots.setAll(STORE.availabilitySlots(currentTeacherId()));
+            renderSlots();
+            refreshInterviews();
+            renderNotifications();
+        });
+
+        if (leadDaysCombo != null) {
+            leadDaysCombo.getItems().setAll(1, 2, 3, 5, 7, 14);
+            leadDaysCombo.setValue(STORE.getNotificationLeadDays());
+            leadDaysCombo.valueProperty().addListener((obs, oldVal, val) -> {
+                if (val != null) {
+                    STORE.setNotificationLeadDays(currentUsername(), val);
+                    renderNotifications();
+                }
+            });
+        }
 
         if (availabilityDate != null && availabilityDate.getValue() == null) {
             availabilityDate.setValue(LocalDate.now().plusDays(2));
@@ -93,6 +114,7 @@ public class TeacherScheduleController {
         slots.setAll(STORE.availabilitySlots(currentTeacherId()));
         renderSlots();
         refreshInterviews();
+        renderNotifications();
     }
 
     private void updateSidebarHeader(Parent root) {
@@ -101,6 +123,7 @@ public class TeacherScheduleController {
         for (Label label : FxNodes.findAllByStyleClass(root, "sidebar-name", Label.class)) {
             label.setText(profile.getName());
         }
+        ProfileCardBuilder.updateAvatarSlot(root, profile, 50);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -138,9 +161,31 @@ public class TeacherScheduleController {
             slots.setAll(STORE.availabilitySlots(currentTeacherId()));
             renderSlots();
             refreshInterviews();
+            renderNotifications();
         });
         if (nav_TeacherHistory != null) nav_TeacherHistory.setOnAction(e -> navigate("TeacherHistory.fxml", nav_TeacherHistory));
         if (nav_Login != null) nav_Login.setOnAction(e -> navigate("Login.fxml", nav_Login));
+    }
+
+    private void renderNotifications() {
+        if (leadDaysCombo != null) {
+            leadDaysCombo.setValue(STORE.getNotificationLeadDays());
+        }
+        if (teacherNotificationsBox == null) return;
+        teacherNotificationsBox.getChildren().clear();
+        List<NotificationItem> notes = STORE.notificationsForUser(currentUsername());
+        if (notes.isEmpty()) {
+            Label none = new Label("No upcoming interview reminders within " + STORE.getNotificationLeadDays() + " day(s) or new result updates.");
+            none.getStyleClass().add("muted");
+            teacherNotificationsBox.getChildren().add(none);
+            return;
+        }
+        for (NotificationItem item : notes) {
+            Label line = new Label("• [" + item.getCreatedAt() + "] " + item.getMessage());
+            line.setWrapText(true);
+            line.getStyleClass().add("table-text");
+            teacherNotificationsBox.getChildren().add(line);
+        }
     }
 
     private void wireSlotActions() {
@@ -309,7 +354,7 @@ public class TeacherScheduleController {
             return;
         }
         if (detail != null) detail.setText(safe(interview.getPartner()) + " · Online interview");
-        if (when != null) when.setText(formatDateTime(interview.getDateTime()) + " · UTC+7 · " + safe(interview.getStatus()));
+        if (when != null) when.setText(formatTimeRange(interview) + " · " + safe(interview.getStatus()));
     }
 
     private void renderConfirmedCard(VBox card, List<Interview> confirmed) {
@@ -328,7 +373,8 @@ public class TeacherScheduleController {
             return;
         }
         Interview first = confirmed.get(0);
-        if (detail != null) detail.setText(safe(first.getPartner()) + " · " + formatDateTime(first.getDateTime()) + " · CONFIRMED");
+        String resultTag = safe(first.getResult()).isBlank() ? "" : (" · Result: " + safe(first.getResult()));
+        if (detail != null) detail.setText(safe(first.getPartner()) + " · " + formatTimeRange(first) + " · CONFIRMED" + resultTag);
         String url = safe(first.getMeetingUrl());
         if (url.isBlank()) {
             url = PortalStore.generateMeetingLink(first);
@@ -339,6 +385,16 @@ public class TeacherScheduleController {
         if (openMeetButton != null) {
             openMeetButton.setDisable(false);
         }
+    }
+
+    private String formatTimeRange(Interview interview) {
+        LocalDateTime start = PortalStore.parseInterviewStart(interview.getDateTime());
+        LocalDateTime end = PortalStore.parseInterviewEnd(interview);
+        if (start != null && end != null) {
+            return start.format(DateTimeFormatter.ofPattern("dd/MM/yyyy · HH:mm"))
+                    + " - " + end.format(DateTimeFormatter.ofPattern("HH:mm")) + " · UTC+7";
+        }
+        return formatDateTime(interview.getDateTime()) + " · UTC+7";
     }
 
     private void updatePendingInterview(String status) {
@@ -352,6 +408,7 @@ public class TeacherScheduleController {
             return;
         }
         refreshInterviews();
+        renderNotifications();
         setMessage("Interview request updated: " + status + ".");
     }
 

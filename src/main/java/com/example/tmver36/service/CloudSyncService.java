@@ -26,13 +26,15 @@ public final class CloudSyncService {
     private static final String DEFAULT_SUPABASE_URL = "https://fvlbezbjqupwlodqelaz.supabase.co";
     private static final String DEFAULT_PUBLISHABLE_KEY = "sb_publishable_3LKenU-kYZH2qL4eNKfWcw_znTEqVP4";
     private static final String DEFAULT_STATE_ID = "tmver36_shared_v2";
-    private static final int MAX_SYNC_FILE_BYTES = 4 * 1024 * 1024; // 4 MB safety cap
+    private static final int MAX_SYNC_FILE_BYTES = 25 * 1024 * 1024; // 25 MB safety cap for intro/demo videos
 
     private final HttpClient httpClient;
     private final String supabaseUrl;
     private final String apiKey;
     private final String stateId;
     private volatile boolean enabled;
+    private volatile String lastError = "";
+    private volatile String simulatedError = null;
 
     public CloudSyncService() {
         this(
@@ -62,7 +64,6 @@ public final class CloudSyncService {
         if (env != null) {
             return Boolean.parseBoolean(env);
         }
-        // If running inside Surefire unit tests with temporary directories, disable unless explicitly enabled
         if (Boolean.getBoolean("tm.test.suppressAlerts")) {
             return false;
         }
@@ -93,7 +94,23 @@ public final class CloudSyncService {
         return stateId;
     }
 
+    public String getLastError() {
+        return lastError == null ? "" : lastError;
+    }
+
+    public void setSimulatedError(String simulatedError) {
+        this.simulatedError = simulatedError;
+    }
+
+    public String getSimulatedError() {
+        return simulatedError;
+    }
+
     public boolean pushProperties(Properties props) {
+        if (simulatedError != null && !simulatedError.isBlank()) {
+            lastError = simulatedError;
+            return false;
+        }
         if (!isEnabled() || props == null) {
             return false;
         }
@@ -115,13 +132,23 @@ public final class CloudSyncService {
                     .build();
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            return response.statusCode() >= 200 && response.statusCode() < 300;
-        } catch (Exception ignored) {
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                lastError = "";
+                return true;
+            }
+            lastError = "Cloud HTTP " + response.statusCode();
+            return false;
+        } catch (Exception ex) {
+            lastError = ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
             return false;
         }
     }
 
     public Properties pullProperties() {
+        if (simulatedError != null && !simulatedError.isBlank()) {
+            lastError = simulatedError;
+            return null;
+        }
         if (!isEnabled()) {
             return null;
         }
@@ -138,27 +165,36 @@ public final class CloudSyncService {
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                lastError = "Cloud HTTP " + response.statusCode();
                 return null;
             }
             String raw = extractJsonField(response.body(), "state_properties");
             if (raw == null || raw.isBlank()) {
+                lastError = "";
                 return null;
             }
             Properties props = new Properties();
             props.load(new StringReader(raw));
+            lastError = "";
             return props;
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            lastError = ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
             return null;
         }
     }
 
     public boolean uploadSharedFile(String fileKey, long teacherId, String fileName, Path localFile) {
+        if (simulatedError != null && !simulatedError.isBlank()) {
+            lastError = simulatedError;
+            return false;
+        }
         if (!isEnabled() || fileKey == null || fileKey.isBlank() || localFile == null || !Files.isRegularFile(localFile)) {
             return false;
         }
         try {
             long size = Files.size(localFile);
             if (size <= 0 || size > MAX_SYNC_FILE_BYTES) {
+                lastError = "File size out of bounds (" + size + " bytes)";
                 return false;
             }
             byte[] bytes = Files.readAllBytes(localFile);
@@ -174,7 +210,7 @@ public final class CloudSyncService {
             String endpoint = supabaseUrl + "/rest/v1/tm_shared_files?on_conflict=file_key";
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(endpoint))
-                    .timeout(Duration.ofSeconds(8))
+                    .timeout(Duration.ofSeconds(12))
                     .header("apikey", apiKey)
                     .header("Content-Type", "application/json")
                     .header("Prefer", "resolution=merge-duplicates,return=minimal")
@@ -182,17 +218,31 @@ public final class CloudSyncService {
                     .build();
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            return response.statusCode() >= 200 && response.statusCode() < 300;
-        } catch (Exception ignored) {
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                lastError = "";
+                return true;
+            }
+            lastError = "Upload HTTP " + response.statusCode();
+            return false;
+        } catch (Exception ex) {
+            lastError = ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
             return false;
         }
     }
 
     public boolean downloadSharedFileIfMissing(String fileKey, Path targetPath) {
+        return downloadSharedFile(fileKey, targetPath, false);
+    }
+
+    public boolean downloadSharedFile(String fileKey, Path targetPath, boolean overwriteExisting) {
+        if (simulatedError != null && !simulatedError.isBlank()) {
+            lastError = simulatedError;
+            return false;
+        }
         if (!isEnabled() || fileKey == null || fileKey.isBlank() || targetPath == null) {
             return false;
         }
-        if (Files.isRegularFile(targetPath)) {
+        if (!overwriteExisting && Files.isRegularFile(targetPath)) {
             return true;
         }
         try {
@@ -200,7 +250,7 @@ public final class CloudSyncService {
             String endpoint = supabaseUrl + "/rest/v1/tm_shared_files?file_key=eq." + encodedKey + "&select=base64_data";
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(endpoint))
-                    .timeout(Duration.ofSeconds(8))
+                    .timeout(Duration.ofSeconds(12))
                     .header("apikey", apiKey)
                     .header("Accept", "application/json")
                     .GET()
@@ -208,6 +258,7 @@ public final class CloudSyncService {
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                lastError = "Download HTTP " + response.statusCode();
                 return false;
             }
             String base64 = extractJsonField(response.body(), "base64_data");
@@ -219,8 +270,10 @@ public final class CloudSyncService {
                 Files.createDirectories(targetPath.getParent());
             }
             Files.write(targetPath, bytes);
+            lastError = "";
             return Files.isRegularFile(targetPath);
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            lastError = ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
             return false;
         }
     }
@@ -233,8 +286,14 @@ public final class CloudSyncService {
         if (lower.endsWith(".pdf")) return "application/pdf";
         if (lower.endsWith(".png")) return "image/png";
         if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+        if (lower.endsWith(".gif")) return "image/gif";
+        if (lower.endsWith(".webp")) return "image/webp";
         if (lower.endsWith(".html") || lower.endsWith(".htm")) return "text/html";
         if (lower.endsWith(".mp4")) return "video/mp4";
+        if (lower.endsWith(".webm")) return "video/webm";
+        if (lower.endsWith(".mov")) return "video/quicktime";
+        if (lower.endsWith(".mkv")) return "video/x-matroska";
+        if (lower.endsWith(".avi")) return "video/x-msvideo";
         return "application/octet-stream";
     }
 

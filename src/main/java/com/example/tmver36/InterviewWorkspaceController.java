@@ -11,6 +11,7 @@ import javafx.scene.Parent;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.input.Clipboard;
@@ -18,17 +19,20 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
-import java.awt.Desktop;
-import java.net.URI;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/** Controller for staff interview coordination and interview-result tracking (InterviewWorkspace.fxml). */
+/** Controller for staff interview coordination, schedule adjustment, and result tracking (InterviewWorkspace.fxml). */
 public class InterviewWorkspaceController {
 
     private final PortalStore store = LoginController.STORE;
     private final ObservableList<Interview> interviewItems = FXCollections.observableArrayList();
+    private static final DateTimeFormatter DISPLAY_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy · HH:mm");
 
     @FXML private Button nav_StaffDashboard;
     @FXML private Button nav_StaffReview;
@@ -38,6 +42,12 @@ public class InterviewWorkspaceController {
     @FXML private ComboBox<String> interviewCombo;
     @FXML private ComboBox<String> stageCombo;
     @FXML private TextField meetUrl;
+    @FXML private DatePicker rescheduleDatePicker;
+    @FXML private ComboBox<String> rescheduleFromCombo;
+    @FXML private ComboBox<String> rescheduleToCombo;
+    @FXML private Button rescheduleInterviewButton;
+    @FXML private TextField staffResultNotesField;
+    @FXML private Button markInterviewSuccessButton;
     @FXML private Button createMeetButton;
     @FXML private Button finalizeInterviewButton;
     @FXML private Button updateHistoryButton;
@@ -48,10 +58,21 @@ public class InterviewWorkspaceController {
     private void initialize() {
         wireNavigation();
         discoverUnidentifiedControls();
+        Parent root = FxNodes.rootOf(nav_InterviewWorkspace, nav_Login, finalizeInterviewButton, updateHistoryButton);
+        ProfileCardBuilder.decorateScreen(root, store, this::refreshInterviews);
+
+        if (rescheduleDatePicker != null && rescheduleDatePicker.getValue() == null) {
+            rescheduleDatePicker.setValue(LocalDate.now().plusDays(1));
+        }
+
         refreshInterviews();
         if (createMeetButton != null) createMeetButton.setOnAction(event -> openMeetCreationPage());
         if (finalizeInterviewButton != null) finalizeInterviewButton.setOnAction(event -> finalizeSelectedInterview());
+        if (rescheduleInterviewButton != null) rescheduleInterviewButton.setOnAction(event -> rescheduleSelectedInterview());
         if (updateHistoryButton != null) updateHistoryButton.setOnAction(event -> updateSelectedInterviewHistory());
+        if (markInterviewSuccessButton != null) {
+            markInterviewSuccessButton.setOnAction(event -> markSelectedInterviewSuccessful());
+        }
         if (interviewCombo != null) interviewCombo.setOnAction(event -> loadSelectedMeetingUrl());
     }
 
@@ -68,7 +89,7 @@ public class InterviewWorkspaceController {
         if (root == null) return;
         List<ComboBox> combos = FxNodes.findAll(root, ComboBox.class);
         if (interviewCombo == null && !combos.isEmpty()) interviewCombo = combos.get(0);
-        if (stageCombo == null && combos.size() > 1) stageCombo = combos.get(1);
+        if (stageCombo == null && combos.size() > 1) stageCombo = combos.get(combos.size() - 1);
 
         List<VBox> tables = FxNodes.findAllByStyleClass(root, "table", VBox.class);
         if (coordinationTable == null && !tables.isEmpty()) coordinationTable = tables.get(0);
@@ -77,6 +98,7 @@ public class InterviewWorkspaceController {
 
     private void refreshInterviews() {
         String username = activeUsername();
+        String prevChoice = interviewCombo == null ? null : interviewCombo.getValue();
         interviewItems.setAll(store.visibleInterviews("STAFF", username));
 
         if (interviewCombo != null) {
@@ -86,7 +108,11 @@ public class InterviewWorkspaceController {
                             .map(this::formatInterviewChoice)
                             .collect(Collectors.toList()));
             interviewCombo.setItems(options);
-            if (!options.isEmpty()) interviewCombo.getSelectionModel().selectFirst();
+            if (prevChoice != null && options.contains(prevChoice)) {
+                interviewCombo.setValue(prevChoice);
+            } else if (!options.isEmpty()) {
+                interviewCombo.getSelectionModel().selectFirst();
+            }
         }
         renderCoordinationTable();
         renderFeedbackTable();
@@ -100,9 +126,13 @@ public class InterviewWorkspaceController {
             HBox row = new HBox(0);
             row.setAlignment(Pos.CENTER_LEFT);
             row.getStyleClass().add("table-row");
-            row.getChildren().add(cell(safe(interview.getTeacherName()), 400));
-            row.getChildren().add(cell(safe(interview.getDateTime()), 320));
-            row.getChildren().add(cell(safe(interview.getStatus()), 250));
+            row.getChildren().add(cell(safe(interview.getTeacherName()) + " · " + safe(interview.getPartner()), 400));
+            row.getChildren().add(cell(formatTimeSlot(interview), 320));
+            String statusAndResult = safe(interview.getStatus());
+            if (!safe(interview.getResult()).isBlank() && !"Pending".equalsIgnoreCase(safe(interview.getResult()))) {
+                statusAndResult += " · " + safe(interview.getResult());
+            }
+            row.getChildren().add(cell(statusAndResult, 250));
             row.setOnMouseClicked(event -> selectInterview(interview));
             coordinationTable.getChildren().add(row);
         }
@@ -122,6 +152,16 @@ public class InterviewWorkspaceController {
             row.setOnMouseClicked(event -> selectInterview(interview));
             feedbackTable.getChildren().add(row);
         }
+    }
+
+    private String formatTimeSlot(Interview interview) {
+        if (interview == null) return "—";
+        LocalDateTime start = PortalStore.parseInterviewStart(interview.getDateTime());
+        LocalDateTime end = PortalStore.parseInterviewEnd(interview);
+        if (start != null && end != null) {
+            return start.format(DISPLAY_FMT) + " - " + end.format(DateTimeFormatter.ofPattern("HH:mm")) + " (UTC+7)";
+        }
+        return safe(interview.getDateTime());
     }
 
     private void removeExistingRows(VBox table) {
@@ -151,24 +191,71 @@ public class InterviewWorkspaceController {
                 interviewCombo.getSelectionModel().select(option);
             }
         }
-        if (meetUrl != null) {
-            String url = safe(interview.getMeetingUrl());
-            if (url.isBlank()) {
-                url = PortalStore.generateMeetingLink(interview);
-            }
-            meetUrl.setText(url);
-        }
+        loadSelectedMeetingUrl();
     }
 
     private void loadSelectedMeetingUrl() {
         Interview selected = selectedInterview();
-        if (selected != null && meetUrl != null) {
+        if (selected == null) return;
+        if (meetUrl != null) {
             String url = safe(selected.getMeetingUrl());
             if (url.isBlank()) {
                 url = PortalStore.generateMeetingLink(selected);
             }
             meetUrl.setText(url);
         }
+        LocalDateTime start = PortalStore.parseInterviewStart(selected.getDateTime());
+        LocalDateTime end = PortalStore.parseInterviewEnd(selected);
+        if (start != null && rescheduleDatePicker != null) {
+            rescheduleDatePicker.setValue(start.toLocalDate());
+        }
+        if (start != null && rescheduleFromCombo != null) {
+            rescheduleFromCombo.setValue(start.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")));
+        }
+        if (end != null && rescheduleToCombo != null) {
+            rescheduleToCombo.setValue(end.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")));
+        }
+        if (staffResultNotesField != null) {
+            staffResultNotesField.setText(safe(selected.getFeedback()));
+        }
+    }
+
+    private void rescheduleSelectedInterview() {
+        Interview selected = selectedInterview();
+        if (selected == null) {
+            showError("No interview selected", "Select an interview to reschedule.");
+            return;
+        }
+        LocalDate date = rescheduleDatePicker == null ? null : rescheduleDatePicker.getValue();
+        String fromText = comboText(rescheduleFromCombo);
+        String toText = comboText(rescheduleToCombo);
+        if (date == null || fromText.isBlank() || toText.isBlank()) {
+            showError("Missing schedule details", "Choose a date, start time, and end time (HH:mm).");
+            return;
+        }
+        try {
+            LocalTime startTime = LocalTime.parse(fromText);
+            LocalTime endTime = LocalTime.parse(toText);
+            LocalDateTime startAt = LocalDateTime.of(date, startTime);
+            LocalDateTime endAt = LocalDateTime.of(date, endTime);
+            if (!store.rescheduleInterview(activeUsername(), selected.getId(), startAt, endAt)) {
+                showError("Schedule Conflict / Validation Error", store.getLastValidationError());
+                return;
+            }
+            refreshInterviews();
+            showInfo("Interview Rescheduled", "Updated interview #" + selected.getId() + " to "
+                    + startAt.format(DISPLAY_FMT) + " - " + endAt.format(DateTimeFormatter.ofPattern("HH:mm")) + " (UTC+7).");
+        } catch (Exception ex) {
+            showError("Invalid time format", "Please enter times in HH:mm format (e.g. 14:00 to 14:30).");
+        }
+    }
+
+    private String comboText(ComboBox<String> combo) {
+        if (combo == null) return "";
+        if (combo.isEditable() && combo.getEditor() != null && combo.getEditor().getText() != null && !combo.getEditor().getText().isBlank()) {
+            return combo.getEditor().getText().trim();
+        }
+        return combo.getValue() == null ? "" : combo.getValue().trim();
     }
 
     private void openMeetCreationPage() {
@@ -222,6 +309,13 @@ public class InterviewWorkspaceController {
         }
     }
 
+    private void markSelectedInterviewSuccessful() {
+        if (stageCombo != null) {
+            stageCombo.setValue("Interview Successful");
+        }
+        updateSelectedInterviewHistory();
+    }
+
     private void updateSelectedInterviewHistory() {
         Interview selected = selectedInterview();
         if (selected == null) {
@@ -229,18 +323,17 @@ public class InterviewWorkspaceController {
             return;
         }
         String stage = stageCombo == null || stageCombo.getValue() == null
-                ? "Awaiting Results" : stageCombo.getValue();
-        String result = switch (stage) {
-            case "Accepted" -> "Proceed";
-            case "Rejected" -> "Do not proceed";
-            case "Interviewed" -> "Interviewed";
-            default -> "Awaiting Results";
-        };
-        store.updateInterview(activeUsername(), selected.getId(), selected.getStatus(), result,
-                selected.getFeedback(), selected.getMeetingUrl());
-        store.log(activeUsername(), "Updated connection history for interview #" + selected.getId() + " to " + stage);
+                ? "Interview Successful" : stageCombo.getValue();
+        String notes = staffResultNotesField == null || staffResultNotesField.getText() == null
+                ? "" : staffResultNotesField.getText().trim();
+        boolean updated = store.updateInterviewResultByStaff(activeUsername(), selected.getId(), stage, notes);
+        if (!updated) {
+            showError("Permission denied", "Only Matching Staff or Administrators can update interview results.");
+            return;
+        }
         refreshInterviews();
-        showInfo("Stage Updated", "Updated interview #" + selected.getId() + " stage to " + stage + ".");
+        showInfo("Interview Result Updated", "Updated interview #" + selected.getId()
+                + " to '" + stage + "' and notified Teacher and Partner.");
     }
 
     private Interview selectedInterview() {

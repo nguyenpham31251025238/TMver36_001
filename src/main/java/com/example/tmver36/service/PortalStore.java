@@ -5,7 +5,9 @@ import com.example.tmver36.model.AppUser;
 import com.example.tmver36.model.AvailabilitySlot;
 import com.example.tmver36.model.Interview;
 import com.example.tmver36.model.TeacherDocument;
+import com.example.tmver36.model.NotificationItem;
 import com.example.tmver36.model.TeacherProfile;
+import java.util.Base64;
 
 import java.io.File;
 import java.io.IOException;
@@ -52,15 +54,25 @@ public class PortalStore {
 
     private final Set<String> granted = new LinkedHashSet<>();
     private final Map<String, String[]> partnerEvaluations = new LinkedHashMap<>();
+    private final Map<Long, String> documentBase64ById = new LinkedHashMap<>();
+    private final List<NotificationItem> notifications = new ArrayList<>();
 
     private final AtomicLong teacherIds = new AtomicLong(3);
     private final AtomicLong documentIds = new AtomicLong(0);
     private final AtomicLong interviewIds = new AtomicLong(3);
     private final AtomicLong availabilityIds = new AtomicLong(0);
+    private final AtomicLong notificationIds = new AtomicLong(0);
+
+    private int notificationLeadDays = 3;
+    private volatile String lastValidationError = "";
+    private volatile String simulatedReloadError = null;
 
     private Path customDataDir;
     private boolean suppressSave;
     private CloudSyncService cloudSync;
+
+    public record ReloadResult(boolean success, String source, String message, String timestamp) {
+    }
 
     public PortalStore() {
         this(null, new CloudSyncService());
@@ -168,10 +180,14 @@ public class PortalStore {
         logs.clear();
         granted.clear();
         partnerEvaluations.clear();
+        documentBase64ById.clear();
+        notifications.clear();
         teacherIds.set(0);
         documentIds.set(0);
         interviewIds.set(0);
         availabilityIds.set(0);
+        notificationIds.set(0);
+        notificationLeadDays = 3;
     }
 
     private Path materializeBundledResource(String resourcePath, long teacherId, String fileName) {
@@ -463,6 +479,8 @@ public class PortalStore {
             props.setProperty(prefix + "timezone", nn(t.getTimezone()));
             props.setProperty(prefix + "staffFeedback", nn(t.getStaffFeedback()));
             props.setProperty(prefix + "reviewChecklist", nn(t.getReviewChecklist()));
+            props.setProperty(prefix + "avatarBase64", nn(t.getAvatarBase64()));
+            props.setProperty(prefix + "updatedAt", nn(t.getUpdatedAt()));
         }
 
         props.setProperty("documents.count", Integer.toString(documents.size()));
@@ -475,6 +493,10 @@ public class PortalStore {
             props.setProperty(prefix + "type", nn(d.type()));
             props.setProperty(prefix + "updatedAt", nn(d.updatedAt()));
             props.setProperty(prefix + "location", nn(d.location()));
+            String docB64 = documentBase64ById.get(d.id());
+            if (docB64 != null && !docB64.isBlank()) {
+                props.setProperty(prefix + "base64", docB64);
+            }
         }
 
         props.setProperty("slots.count", Integer.toString(availabilitySlots.size()));
@@ -517,6 +539,24 @@ public class PortalStore {
             props.setProperty(prefix + "result", nn(iv.getResult()));
             props.setProperty(prefix + "feedback", nn(iv.getFeedback()));
             props.setProperty(prefix + "meetingUrl", nn(iv.getMeetingUrl()));
+        }
+
+        props.setProperty("config.notificationLeadDays", Integer.toString(notificationLeadDays));
+        props.setProperty("seq.notificationIds", Long.toString(notificationIds.get()));
+        props.setProperty("notifications.count", Integer.toString(notifications.size()));
+        for (int i = 0; i < notifications.size(); i++) {
+            NotificationItem n = notifications.get(i);
+            String prefix = "notification." + i + ".";
+            props.setProperty(prefix + "id", Long.toString(n.id()));
+            props.setProperty(prefix + "targetRole", nn(n.targetRole()));
+            props.setProperty(prefix + "targetUser", nn(n.targetUser()));
+            props.setProperty(prefix + "teacherId", Long.toString(n.teacherId()));
+            props.setProperty(prefix + "partner", nn(n.partner()));
+            props.setProperty(prefix + "type", nn(n.type()));
+            props.setProperty(prefix + "title", nn(n.title()));
+            props.setProperty(prefix + "message", nn(n.message()));
+            props.setProperty(prefix + "createdAt", nn(n.createdAt()));
+            props.setProperty(prefix + "read", Boolean.toString(n.read()));
         }
 
         props.setProperty("logs.count", Integer.toString(logs.size()));
@@ -664,8 +704,11 @@ public class PortalStore {
                         props.getProperty(prefix + "reviewChecklist", id <= 2 ? "1,1,1,1,1" : "1,1,1,0,0")
                 );
                 t.setTargetAgeGroup(props.getProperty(prefix + "targetAgeGroup", "Primary (6-11)"));
-                t.setAvailableStartDate(props.getProperty(prefix + "availableStartDate", "01/12/2026"));
+                String availStart = props.getProperty(prefix + "availableStartDate", props.getProperty(prefix + "availability", "01/12/2026"));
+                t.setAvailableStartDate(availStart);
                 t.setTimezone(props.getProperty(prefix + "timezone", "UTC+7 (Vietnam)"));
+                t.setAvatarBase64(props.getProperty(prefix + "avatarBase64", ""));
+                t.setUpdatedAt(props.getProperty(prefix + "updatedAt", ""));
                 teachers.add(t);
                 if (id > teacherIds.get()) {
                     teacherIds.set(id);
@@ -683,6 +726,10 @@ public class PortalStore {
                 String location = upgradeSampleDocPath(teacherId, props.getProperty(prefix + "location", ""), type);
                 if (!fileName.isBlank()) {
                     documents.add(new TeacherDocument(id, teacherId, fileName, type, updatedAt, location));
+                    String docB64 = props.getProperty(prefix + "base64", "");
+                    if (docB64 != null && !docB64.isBlank()) {
+                        documentBase64ById.put(id, docB64);
+                    }
                     if (id > documentIds.get()) {
                         documentIds.set(id);
                     }
@@ -752,6 +799,30 @@ public class PortalStore {
                 interviews.add(iv);
                 if (id > interviewIds.get()) {
                     interviewIds.set(id);
+                }
+            }
+
+            notificationLeadDays = Math.max(0, parseInt(props.getProperty("config.notificationLeadDays"), 3));
+            notificationIds.set(parseLong(props.getProperty("seq.notificationIds"), 0L));
+            int notifCount = parseInt(props.getProperty("notifications.count"), 0);
+            for (int i = 0; i < notifCount; i++) {
+                String prefix = "notification." + i + ".";
+                long nid = parseLong(props.getProperty(prefix + "id"), i + 1L);
+                NotificationItem item = new NotificationItem(
+                        nid,
+                        props.getProperty(prefix + "targetRole", "ALL"),
+                        props.getProperty(prefix + "targetUser", ""),
+                        parseLong(props.getProperty(prefix + "teacherId"), -1L),
+                        props.getProperty(prefix + "partner", ""),
+                        props.getProperty(prefix + "type", "INFO"),
+                        props.getProperty(prefix + "title", ""),
+                        props.getProperty(prefix + "message", ""),
+                        props.getProperty(prefix + "createdAt", ""),
+                        Boolean.parseBoolean(props.getProperty(prefix + "read", "false"))
+                );
+                notifications.add(item);
+                if (nid > notificationIds.get()) {
+                    notificationIds.set(nid);
                 }
             }
 
@@ -1153,16 +1224,19 @@ public class PortalStore {
         if (target != updated) {
             target.setFullName(updated.getFullName());
             target.setEmail(updated.getEmail());
-            target.setNationality(updated.getNationality());
+            target.setNationality(CatalogData.formatNationality(updated.getNationality()));
             target.setLocation(updated.getLocation());
-            target.setExperience(updated.getExperience());
+            target.setExperience(CatalogData.normalizeExperienceBand(updated.getExperience()));
             target.setCertificates(updated.getCertificates());
             target.setDegree(updated.getDegree());
             target.setMajor(updated.getMajor());
-            target.setExpectedSalary(updated.getExpectedSalary());
+            target.setExpectedSalary(CatalogData.formatSalary(updated.getExpectedSalary()));
             target.setStatus(updated.getStatus());
             target.setAvailability(updated.getAvailability());
             target.setAvatarUrl(updated.getAvatarUrl());
+            if (!updated.getAvatarBase64().isBlank()) {
+                target.setAvatarBase64(updated.getAvatarBase64());
+            }
             target.setCvUrl(updated.getCvUrl());
             target.setCertificateUrl(updated.getCertificateUrl());
             target.setIntroVideoUrl(updated.getIntroVideoUrl());
@@ -1171,11 +1245,17 @@ public class PortalStore {
             target.setBio(updated.getBio());
             target.setPhone(updated.getPhone());
             target.setTargetAgeGroup(updated.getTargetAgeGroup());
-            target.setAvailableStartDate(updated.getAvailableStartDate());
+            String avail = !updated.getAvailableStartDate().isBlank() ? updated.getAvailableStartDate() : updated.getAvailability();
+            target.setAvailableStartDate(avail);
             target.setTimezone(updated.getTimezone());
             target.setStaffFeedback(updated.getStaffFeedback());
             target.setReviewChecklist(updated.getReviewChecklist());
+        } else {
+            target.setNationality(CatalogData.formatNationality(target.getNationality()));
+            target.setExperience(CatalogData.normalizeExperienceBand(target.getExperience()));
+            target.setExpectedSalary(CatalogData.formatSalary(target.getExpectedSalary()));
         }
+        target.setUpdatedAt(nowUtc7String());
         for (Interview iv : interviews) {
             if (iv.getTeacherId() == target.getId()) {
                 iv.setTeacherName(target.getName());
@@ -1234,13 +1314,27 @@ public class PortalStore {
         try {
             Path targetDir = getDataDir().resolve("documents").resolve(Long.toString(teacherId));
             Files.createDirectories(targetDir);
-            String safeName = "avatar_" + teacherId + "_" + sourceImage.getFileName().toString().replaceAll("[^a-zA-Z0-9._-]", "_");
+            String cleanBase = sourceImage.getFileName().toString().replaceAll("[^a-zA-Z0-9._-]", "_");
+            String safeName = "avatar_" + teacherId + "_" + System.currentTimeMillis() + "_" + cleanBase;
             Path dest = targetDir.resolve(safeName);
             Files.copy(sourceImage, dest, StandardCopyOption.REPLACE_EXISTING);
+            try {
+                Path sharedDir = getSharedMediaDir();
+                Files.createDirectories(sharedDir);
+                Files.copy(dest, sharedDir.resolve(safeName), StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(dest, sharedDir.resolve("avatar_latest_" + teacherId + "_" + cleanBase), StandardCopyOption.REPLACE_EXISTING);
+            } catch (Exception ignored) {
+            }
+            byte[] bytes = Files.readAllBytes(dest);
+            if (bytes.length > 0 && bytes.length <= 2 * 1024 * 1024) {
+                teacher.setAvatarBase64(Base64.getEncoder().encodeToString(bytes));
+            }
             String storedPath = dest.toAbsolutePath().toString();
             teacher.setAvatarUrl(storedPath);
+            teacher.setUpdatedAt(nowUtc7String());
             if (cloudSync != null && cloudSync.isEnabled()) {
                 cloudSync.uploadSharedFile("avatar:" + teacherId, teacherId, safeName, dest);
+                cloudSync.uploadSharedFile("avatar:" + teacherId + ":" + safeName, teacherId, safeName, dest);
             }
             log(actor, "Updated profile avatar for " + teacher.getName());
             saveState();
@@ -1248,6 +1342,59 @@ public class PortalStore {
         } catch (IOException ex) {
             return null;
         }
+    }
+
+    public synchronized Path resolveTeacherAvatarFile(TeacherProfile teacher) {
+        if (teacher == null) {
+            return null;
+        }
+        String raw = teacher.getAvatarUrl() == null ? "" : teacher.getAvatarUrl().trim();
+        if (raw.isEmpty() || raw.startsWith("photo/") || raw.startsWith("/com/example/")) {
+            return null;
+        }
+        try {
+            Path direct = raw.startsWith("file:") ? Paths.get(java.net.URI.create(raw)) : Paths.get(raw);
+            if (Files.isRegularFile(direct) && Files.size(direct) > 0) {
+                return direct.toAbsolutePath();
+            }
+        } catch (Exception ignored) {
+        }
+        String fileName = "avatar_" + teacher.getId() + ".png";
+        try {
+            Path p = raw.startsWith("file:") ? Paths.get(java.net.URI.create(raw)) : Paths.get(raw);
+            if (p.getFileName() != null) {
+                fileName = p.getFileName().toString().replaceAll("[^a-zA-Z0-9._-]", "_");
+            }
+        } catch (Exception ignored) {
+        }
+        Path localTarget = getDataDir().resolve("documents").resolve(Long.toString(teacher.getId())).resolve(fileName);
+        try {
+            if (Files.isRegularFile(localTarget) && Files.size(localTarget) > 0) {
+                return localTarget.toAbsolutePath();
+            }
+            Files.createDirectories(localTarget.getParent());
+            Path sharedCandidate = getSharedMediaDir().resolve(fileName);
+            if (Files.isRegularFile(sharedCandidate) && Files.size(sharedCandidate) > 0) {
+                Files.copy(sharedCandidate, localTarget, StandardCopyOption.REPLACE_EXISTING);
+                return localTarget.toAbsolutePath();
+            }
+            String b64 = teacher.getAvatarBase64();
+            if (b64 != null && !b64.isBlank()) {
+                byte[] decoded = Base64.getDecoder().decode(b64);
+                if (decoded.length > 0) {
+                    Files.write(localTarget, decoded);
+                    return localTarget.toAbsolutePath();
+                }
+            }
+            if (cloudSync != null && cloudSync.isEnabled()) {
+                if (cloudSync.downloadSharedFile("avatar:" + teacher.getId() + ":" + fileName, localTarget, true)
+                        || cloudSync.downloadSharedFile("avatar:" + teacher.getId(), localTarget, true)) {
+                    return localTarget.toAbsolutePath();
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     public synchronized List<TeacherDocument> documents(long teacherId) {
@@ -1321,12 +1468,26 @@ public class PortalStore {
             documents.add(doc);
         }
 
-        if (copiedLocalFile != null && cloudSync != null && cloudSync.isEnabled()) {
-            String fileKey = "doc:" + teacherId + ":" + normalizeDocCategoryKey(type);
-            cloudSync.uploadSharedFile(fileKey, teacherId, safeFileName, copiedLocalFile);
+        if (copiedLocalFile != null) {
+            try {
+                Path sharedDir = getSharedMediaDir();
+                Files.createDirectories(sharedDir);
+                Files.copy(copiedLocalFile, sharedDir.resolve(teacherId + "_" + safeFileName), StandardCopyOption.REPLACE_EXISTING);
+                long fSize = Files.size(copiedLocalFile);
+                if (fSize > 0 && fSize <= 2 * 1024 * 1024) {
+                    documentBase64ById.put(doc.id(), Base64.getEncoder().encodeToString(Files.readAllBytes(copiedLocalFile)));
+                }
+            } catch (Exception ignored) {
+            }
+            if (cloudSync != null && cloudSync.isEnabled()) {
+                String catKey = "doc:" + teacherId + ":" + normalizeDocCategoryKey(type);
+                cloudSync.uploadSharedFile(catKey, teacherId, safeFileName, copiedLocalFile);
+                cloudSync.uploadSharedFile(catKey + ":" + safeFileName, teacherId, safeFileName, copiedLocalFile);
+            }
         }
 
         syncTeacherDocumentFields(teacher, doc.type(), storedLocation, doc.fileName());
+        teacher.setUpdatedAt(nowUtc7String());
         log(actor, "Updated document (" + type.trim() + "): " + fileName.trim());
         saveState();
         return doc;
@@ -1346,6 +1507,74 @@ public class PortalStore {
         return lower.replaceAll("[^a-z0-9]+", "_");
     }
 
+    public static boolean isVideoDocument(TeacherDocument doc) {
+        if (doc == null) return false;
+        String cat = normalizeDocCategoryKey(doc.type());
+        if ("intro_video".equals(cat) || "teaching_video".equals(cat) || cat.contains("video")) {
+            return true;
+        }
+        String fn = doc.fileName() == null ? "" : doc.fileName().toLowerCase(Locale.ROOT);
+        String loc = doc.location() == null ? "" : doc.location().toLowerCase(Locale.ROOT);
+        return fn.endsWith(".mp4") || fn.endsWith(".webm") || fn.endsWith(".mov") || fn.endsWith(".mkv") || fn.endsWith(".avi")
+                || loc.endsWith(".mp4") || loc.endsWith(".webm") || loc.endsWith(".mov") || loc.endsWith(".mkv") || loc.endsWith(".avi");
+    }
+
+    public synchronized TeacherDocument findBestVideoDocument(long teacherId, String preferredType) {
+        List<TeacherDocument> docs = documents(teacherId);
+        if (preferredType != null && !preferredType.isBlank()) {
+            String targetKey = normalizeDocCategoryKey(preferredType);
+            for (TeacherDocument d : docs) {
+                if (normalizeDocCategoryKey(d.type()).equals(targetKey)) {
+                    return d;
+                }
+            }
+        }
+        for (TeacherDocument d : docs) {
+            if ("intro_video".equals(normalizeDocCategoryKey(d.type()))) {
+                return d;
+            }
+        }
+        for (TeacherDocument d : docs) {
+            if ("teaching_video".equals(normalizeDocCategoryKey(d.type()))) {
+                return d;
+            }
+        }
+        for (TeacherDocument d : docs) {
+            if (isVideoDocument(d)) {
+                return d;
+            }
+        }
+        return null;
+    }
+
+    public synchronized boolean canUserAccessTeacher(String username, long teacherId) {
+        if (username == null || username.isBlank()) {
+            return false;
+        }
+        AppUser user = users.get(username.trim());
+        if (user == null || !user.isActive() || teacher(teacherId) == null) {
+            return false;
+        }
+        String role = user.getRole();
+        if ("STAFF".equals(role) || "ADMIN".equals(role)) {
+            return true;
+        }
+        if ("TEACHER".equals(role)) {
+            return teacherIdForUser(username.trim()) == teacherId;
+        }
+        if ("PARTNER".equals(role)) {
+            return canPartnerAccessTeacher(username.trim(), teacherId);
+        }
+        return false;
+    }
+
+    public synchronized boolean canUserAccessDocument(String actor, TeacherDocument doc) {
+        if (doc == null || actor == null || actor.isBlank()) {
+            return false;
+        }
+        return canUserAccessTeacher(actor.trim(), doc.teacherId());
+    }
+
     public synchronized Path resolveDocumentLocalFile(TeacherDocument doc) {
         if (doc == null || doc.location() == null || doc.location().isBlank()) {
             return null;
@@ -1356,58 +1585,96 @@ public class PortalStore {
         }
         try {
             Path p = loc.startsWith("file:") ? Paths.get(java.net.URI.create(loc)) : Paths.get(loc);
-            if (Files.isRegularFile(p)) {
-                return p;
+            if (Files.isRegularFile(p) && Files.size(p) > 0) {
+                return p.toAbsolutePath();
             }
         } catch (Exception ignored) {
         }
         String safeName = doc.fileName().replaceAll("[^a-zA-Z0-9._-]", "_");
         Path localTarget = getDataDir().resolve("documents").resolve(Long.toString(doc.teacherId())).resolve(safeName);
-        if (Files.isRegularFile(localTarget)) {
-            return localTarget;
-        }
-        if (cloudSync != null && cloudSync.isEnabled()) {
-            String key = "doc:" + doc.teacherId() + ":" + normalizeDocCategoryKey(doc.type());
-            if (cloudSync.downloadSharedFileIfMissing(key, localTarget)) {
-                return localTarget;
+        try {
+            if (Files.isRegularFile(localTarget) && Files.size(localTarget) > 0) {
+                return localTarget.toAbsolutePath();
             }
+            Files.createDirectories(localTarget.getParent());
+            Path sharedFile = getSharedMediaDir().resolve(doc.teacherId() + "_" + safeName);
+            if (Files.isRegularFile(sharedFile) && Files.size(sharedFile) > 0) {
+                Files.copy(sharedFile, localTarget, StandardCopyOption.REPLACE_EXISTING);
+                return localTarget.toAbsolutePath();
+            }
+            String b64 = documentBase64ById.get(doc.id());
+            if (b64 != null && !b64.isBlank()) {
+                byte[] decoded = Base64.getDecoder().decode(b64);
+                if (decoded.length > 0) {
+                    Files.write(localTarget, decoded);
+                    return localTarget.toAbsolutePath();
+                }
+            }
+            if (cloudSync != null && cloudSync.isEnabled()) {
+                String catKey = "doc:" + doc.teacherId() + ":" + normalizeDocCategoryKey(doc.type());
+                if (cloudSync.downloadSharedFile(catKey + ":" + safeName, localTarget, true)
+                        || cloudSync.downloadSharedFile(catKey, localTarget, true)) {
+                    return localTarget.toAbsolutePath();
+                }
+            }
+        } catch (Exception ignored) {
         }
         return materializeBundledResource("/com/example/tmver36/samples/" + doc.fileName(), doc.teacherId(), safeName);
     }
 
     public synchronized boolean openDocument(String actor, TeacherDocument doc) {
         if (doc == null) {
+            lastValidationError = "Document not found.";
+            return false;
+        }
+        if (!canUserAccessDocument(actor, doc)) {
+            lastValidationError = "Access denied: user is not authorized to open this document/video.";
+            log(actor == null ? "ANONYMOUS" : actor, "ACCESS_DENIED opening document " + doc.fileName());
             return false;
         }
         String loc = doc.location() == null ? "" : doc.location().trim();
         if (loc.startsWith("http://") || loc.startsWith("https://")) {
-            boolean ok = openInBrowser(loc);
-            if (ok) {
-                log(actor, "Opened document URL " + doc.fileName());
+            try {
+                java.net.URI.create(loc.replace(" ", "%20"));
+            } catch (Exception ex) {
+                lastValidationError = "Invalid document URL: " + loc;
+                return false;
             }
-            return ok;
+            openInBrowser(loc);
+            lastValidationError = "";
+            log(actor, "Opened document URL " + doc.fileName());
+            return true;
         }
         Path local = resolveDocumentLocalFile(doc);
-        if (local == null || !Files.isRegularFile(local)) {
+        try {
+            if (local == null || !Files.isRegularFile(local) || Files.size(local) <= 0) {
+                lastValidationError = "Media/document file could not be resolved or is empty: " + doc.fileName();
+                return false;
+            }
+        } catch (IOException ex) {
+            lastValidationError = "Failed to read media/document file: " + doc.fileName();
             return false;
         }
+        lastValidationError = "";
         if (Boolean.getBoolean("tm.test.suppressAlerts")) {
             log(actor, "Opened document " + doc.fileName());
             return true;
         }
-        try {
-            if (java.awt.Desktop.isDesktopSupported()) {
-                java.awt.Desktop.getDesktop().open(local.toFile());
-                log(actor, "Opened document " + doc.fileName());
-                return true;
+        final Path finalLocal = local.toAbsolutePath();
+        Thread opener = new Thread(() -> {
+            try {
+                if (java.awt.Desktop.isDesktopSupported()) {
+                    java.awt.Desktop.getDesktop().open(finalLocal.toFile());
+                    return;
+                }
+            } catch (Exception ignored) {
             }
-        } catch (Exception ignored) {
-        }
-        boolean ok = openInBrowser(local.toUri().toString());
-        if (ok) {
-            log(actor, "Opened document " + doc.fileName());
-        }
-        return ok;
+            openInBrowser(finalLocal.toUri().toString());
+        }, "tm-doc-opener");
+        opener.setDaemon(true);
+        opener.start();
+        log(actor, "Opened document " + doc.fileName());
+        return true;
     }
 
     public synchronized boolean removeDocument(String actor, long teacherId, long documentId) {
@@ -1596,6 +1863,25 @@ public class PortalStore {
         return evaluation == null ? null : evaluation.clone();
     }
 
+    public synchronized boolean isTeacherShortlistedByPartner(String partnerUsername, long teacherId) {
+        if (partnerUsername == null || partnerUsername.isBlank()) {
+            return false;
+        }
+        String[] eval = partnerEvaluations.get(partnerUsername.trim() + ":" + teacherId);
+        return eval != null && eval.length > 0 && CatalogData.isShortlistedDecision(eval[0]);
+    }
+
+    public synchronized boolean togglePartnerShortlist(String partnerUsername, long teacherId) {
+        if (!canPartnerAccessTeacher(partnerUsername, teacherId)) {
+            return false;
+        }
+        String[] existing = partnerEvaluation(partnerUsername, teacherId);
+        boolean shortlisted = existing != null && existing.length > 0 && CatalogData.isShortlistedDecision(existing[0]);
+        String nextDecision = shortlisted ? "Pending" : "Shortlist";
+        String comment = (existing != null && existing.length > 1) ? existing[1] : "";
+        return savePartnerEvaluation(partnerUsername, teacherId, nextDecision, comment);
+    }
+
     public synchronized void status(long id, String status) {
         status("staff", id, status);
     }
@@ -1691,6 +1977,12 @@ public class PortalStore {
             partnerName = partner.getUsername();
         }
 
+        String conflict = checkInterviewConflict(-1L, teacherId, partnerName, requestedAt, slot.endAt());
+        if (conflict != null) {
+            lastValidationError = conflict;
+            return false;
+        }
+
         long newId = interviewIds.incrementAndGet();
         String autoMeetUrl = generateMeetingLink(newId, teacher.getName(), partnerName, dateTime);
         Interview interview = new Interview(
@@ -1707,8 +1999,181 @@ public class PortalStore {
         interview.setEndDateTime(slot.endAt().toString());
         interviews.add(interview);
         availabilitySlots.remove(slot);
+        lastValidationError = "";
 
+        addNotification(
+                "BOTH",
+                "",
+                teacherId,
+                partnerName,
+                "INTERVIEW_SCHEDULED",
+                "New Interview Scheduled",
+                "Interview #" + newId + " scheduled for " + teacher.getName() + " with " + partnerName
+                        + " at " + CatalogData.formatInterviewTimeRange(interview.getDateTime(), interview.getEndDateTime())
+        );
         log(partnerUsername, "Interview requested for " + teacher.getName() + " at " + dateTime);
+        saveState();
+        return true;
+    }
+
+    public synchronized String checkInterviewConflict(
+            long excludeInterviewId,
+            long teacherId,
+            String partnerIdentifier,
+            LocalDateTime startAt,
+            LocalDateTime endAt
+    ) {
+        if (startAt == null || endAt == null || !endAt.isAfter(startAt)) {
+            return "Invalid interview time range: end time must be after start time.";
+        }
+        for (Interview iv : interviews) {
+            if (iv.getId() == excludeInterviewId) {
+                continue;
+            }
+            String st = iv.getStatus() == null ? "" : iv.getStatus().trim().toUpperCase(Locale.ROOT);
+            if ("DECLINED".equals(st) || "CANCELLED".equals(st) || "REJECTED".equals(st)) {
+                continue;
+            }
+            LocalDateTime ivStart = parseInterviewStart(iv);
+            LocalDateTime ivEnd = parseInterviewEnd(iv, ivStart);
+            if (ivStart == null || ivEnd == null) {
+                continue;
+            }
+            if (startAt.isBefore(ivEnd) && endAt.isAfter(ivStart)) {
+                if (iv.getTeacherId() == teacherId) {
+                    return "Schedule conflict: Teacher " + iv.getTeacherName()
+                            + " already has interview #" + iv.getId() + " at "
+                            + CatalogData.formatInterviewTimeRange(iv.getDateTime(), iv.getEndDateTime());
+                }
+                if (partnerIdentifier != null && !partnerIdentifier.isBlank()
+                        && isSamePartner(iv.getPartner(), partnerIdentifier)) {
+                    return "Schedule conflict: Partner " + iv.getPartner()
+                            + " already has interview #" + iv.getId() + " at "
+                            + CatalogData.formatInterviewTimeRange(iv.getDateTime(), iv.getEndDateTime());
+                }
+            }
+        }
+        return null;
+    }
+
+    public synchronized boolean rescheduleInterview(
+            String actor,
+            long interviewId,
+            LocalDateTime newStartAt,
+            LocalDateTime newEndAt
+    ) {
+        Interview interview = findInterview(interviewId);
+        if (interview == null) {
+            lastValidationError = "Interview not found.";
+            return false;
+        }
+        String role = userRole(actor);
+        boolean isStaffOrAdmin = "STAFF".equals(role) || "ADMIN".equals(role);
+        boolean isPartnerOwner = "PARTNER".equals(role) && isSamePartner(interview.getPartner(), actor);
+        if (!isStaffOrAdmin && !isPartnerOwner) {
+            lastValidationError = "Access denied: role is not authorized to reschedule this interview.";
+            return false;
+        }
+        if (newStartAt == null || newEndAt == null || !newEndAt.isAfter(newStartAt)) {
+            lastValidationError = "End time must be after start time.";
+            return false;
+        }
+        String conflict = checkInterviewConflict(
+                interviewId,
+                interview.getTeacherId(),
+                interview.getPartner(),
+                newStartAt,
+                newEndAt
+        );
+        if (conflict != null) {
+            lastValidationError = conflict;
+            return false;
+        }
+        interview.setDateTime(newStartAt.toString());
+        interview.setEndDateTime(newEndAt.toString());
+        lastValidationError = "";
+        String formattedSlot = CatalogData.formatInterviewTimeRange(interview.getDateTime(), interview.getEndDateTime());
+        addNotification(
+                "BOTH",
+                "",
+                interview.getTeacherId(),
+                interview.getPartner(),
+                "INTERVIEW_RESCHEDULED",
+                "Interview Schedule Updated",
+                "Interview #" + interview.getId() + " (" + interview.getTeacherName() + " · " + interview.getPartner()
+                        + ") was rescheduled by " + actor + " to " + formattedSlot
+        );
+        log(actor, "Rescheduled interview #" + interviewId + " to " + formattedSlot);
+        saveState();
+        return true;
+    }
+
+    public synchronized boolean updateInterviewResultByStaff(
+            String actor,
+            long interviewId,
+            String resultOrStage,
+            String staffComments
+    ) {
+        String role = userRole(actor);
+        if (!("STAFF".equals(role) || "ADMIN".equals(role))) {
+            lastValidationError = "Only Staff or Admin can update official interview results.";
+            return false;
+        }
+        Interview interview = findInterview(interviewId);
+        if (interview == null || resultOrStage == null || resultOrStage.isBlank()) {
+            lastValidationError = "Interview or result value is missing.";
+            return false;
+        }
+        String trimmed = resultOrStage.trim();
+        String lower = trimmed.toLowerCase(Locale.ROOT);
+        String mappedResult;
+        String nextStatus = interview.getStatus();
+        if (lower.contains("success") || lower.equals("passed")) {
+            mappedResult = "Interview Successful";
+            if ("PENDING".equalsIgnoreCase(nextStatus) || nextStatus == null || nextStatus.isBlank()) {
+                nextStatus = "CONFIRMED";
+            }
+        } else if (lower.equals("accepted") || lower.equals("proceed")) {
+            mappedResult = "Proceed";
+            if ("PENDING".equalsIgnoreCase(nextStatus) || nextStatus == null || nextStatus.isBlank()) {
+                nextStatus = "CONFIRMED";
+            }
+        } else if (lower.equals("rejected") || lower.contains("not proceed") || lower.contains("failed")) {
+            mappedResult = "Do not proceed";
+        } else if (lower.equals("interviewed")) {
+            mappedResult = "Interviewed";
+            if ("PENDING".equalsIgnoreCase(nextStatus) || nextStatus == null || nextStatus.isBlank()) {
+                nextStatus = "CONFIRMED";
+            }
+        } else if (lower.contains("awaiting")) {
+            mappedResult = "Awaiting Results";
+        } else {
+            mappedResult = trimmed;
+        }
+
+        interview.setStatus(nextStatus);
+        interview.setResult(mappedResult);
+        if (staffComments != null && !staffComments.isBlank()) {
+            interview.setFeedback(staffComments.trim());
+        }
+        if (interview.getMeetingUrl() == null || interview.getMeetingUrl().isBlank()) {
+            interview.setMeetingUrl(generateMeetingLink(interview));
+        }
+        lastValidationError = "";
+        String noteSuffix = (interview.getFeedback() == null || interview.getFeedback().isBlank())
+                ? ""
+                : " — Notes: " + interview.getFeedback();
+        addNotification(
+                "BOTH",
+                "",
+                interview.getTeacherId(),
+                interview.getPartner(),
+                "INTERVIEW_RESULT",
+                "Interview Result Updated: " + mappedResult,
+                "Staff updated interview #" + interview.getId() + " (" + interview.getTeacherName()
+                        + " · " + interview.getPartner() + ") result to '" + mappedResult + "'" + noteSuffix
+        );
+        log(actor, "Updated interview #" + interviewId + " result to " + mappedResult);
         saveState();
         return true;
     }
@@ -1743,6 +2208,7 @@ public class PortalStore {
                 && !Set.of("PENDING", "CONFIRMED", "DECLINED", "COMPLETED").contains(status)) {
             return false;
         }
+        String previousResult = interview.getResult() == null ? "" : interview.getResult();
         if (meetUrl != null && !meetUrl.isBlank()) {
             interview.setMeetingUrl(meetUrl.trim());
         } else if (interview.getMeetingUrl() == null || interview.getMeetingUrl().isBlank()) {
@@ -1756,6 +2222,22 @@ public class PortalStore {
         }
         if (feedback != null) {
             interview.setFeedback(feedback);
+        }
+        if (staff && result != null && !result.isBlank() && !result.equalsIgnoreCase(previousResult)
+                && !result.equalsIgnoreCase("Not reviewed")) {
+            String noteSuffix = (interview.getFeedback() == null || interview.getFeedback().isBlank())
+                    ? ""
+                    : " — Notes: " + interview.getFeedback();
+            addNotification(
+                    "BOTH",
+                    "",
+                    interview.getTeacherId(),
+                    interview.getPartner(),
+                    "INTERVIEW_RESULT",
+                    "Interview Result Updated: " + result.trim(),
+                    "Staff updated interview #" + interview.getId() + " (" + interview.getTeacherName()
+                            + " · " + interview.getPartner() + ") result to '" + result.trim() + "'" + noteSuffix
+            );
         }
         log(actor, "Updated interview #" + id);
         saveState();
@@ -1871,7 +2353,7 @@ public class PortalStore {
         }
     }
 
-    private Interview findInterview(long id) {
+    public synchronized Interview findInterview(long id) {
         return interviews.stream()
                 .filter(interview -> interview.getId() == id)
                 .findFirst()
@@ -1892,5 +2374,229 @@ public class PortalStore {
                 }
         );
         saveState();
+    }
+
+    public String getLastValidationError() {
+        return lastValidationError == null ? "" : lastValidationError;
+    }
+
+    public void setSimulatedReloadError(String simulatedReloadError) {
+        this.simulatedReloadError = simulatedReloadError;
+    }
+
+    public String getSimulatedReloadError() {
+        return simulatedReloadError;
+    }
+
+    public synchronized ReloadResult reloadLatestData() {
+        String ts = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")) + " (UTC+7)";
+        if (simulatedReloadError != null && !simulatedReloadError.isBlank()) {
+            return new ReloadResult(false, "ERROR", simulatedReloadError, ts);
+        }
+        if (cloudSync != null && cloudSync.isEnabled()) {
+            Properties remoteProps = cloudSync.pullProperties();
+            if (remoteProps != null && loadFromProperties(remoteProps)) {
+                saveLocalOnly();
+                return new ReloadResult(true, "CLOUD", "Reloaded latest data from cloud & local storage.", ts);
+            }
+            String cloudErr = cloudSync.getLastError();
+            if (cloudErr != null && !cloudErr.isBlank()) {
+                Path sf = getStateFilePath();
+                if (Files.isRegularFile(sf)) {
+                    loadFromDisk(sf);
+                }
+                return new ReloadResult(false, "CLOUD_ERROR", "Cloud sync failed: " + cloudErr, ts);
+            }
+        }
+        Path stateFile = getStateFilePath();
+        if (Files.isRegularFile(stateFile)) {
+            if (loadFromDisk(stateFile)) {
+                return new ReloadResult(true, "LOCAL_DISK", "Reloaded latest data from local storage.", ts);
+            }
+            return new ReloadResult(false, "DISK_ERROR", "Failed to read local storage file.", ts);
+        }
+        return new ReloadResult(true, "MEMORY", "Data is up to date.", ts);
+    }
+
+    public synchronized int getNotificationLeadDays() {
+        return notificationLeadDays;
+    }
+
+    public synchronized boolean setNotificationLeadDays(String actor, int days) {
+        if (actor == null || !userExists(actor) || days < 0 || days > 60) {
+            return false;
+        }
+        this.notificationLeadDays = days;
+        log(actor, "Updated interview notification reminder lead days to " + days + " day(s)");
+        saveState();
+        return true;
+    }
+
+    private void addNotification(
+            String targetRole,
+            String targetUser,
+            long teacherId,
+            String partner,
+            String type,
+            String title,
+            String message
+    ) {
+        NotificationItem item = new NotificationItem(
+                notificationIds.incrementAndGet(),
+                targetRole,
+                targetUser,
+                teacherId,
+                partner,
+                type,
+                title,
+                message,
+                nowUtc7String(),
+                false
+        );
+        notifications.add(0, item);
+    }
+
+    public synchronized List<NotificationItem> notificationsForUser(String username) {
+        if (username == null || !userExists(username)) {
+            return List.of();
+        }
+        AppUser user = users.get(username.trim());
+        if (user == null || !user.isActive()) {
+            return List.of();
+        }
+        String role = user.getRole();
+        List<NotificationItem> items = new ArrayList<>();
+
+        LocalDate today = LocalDate.now();
+        LocalDate maxDate = today.plusDays(notificationLeadDays);
+        List<Interview> myInterviews = visibleInterviews(role, username.trim());
+        for (Interview iv : myInterviews) {
+            String st = iv.getStatus() == null ? "" : iv.getStatus().trim().toUpperCase(Locale.ROOT);
+            if ("DECLINED".equals(st) || "CANCELLED".equals(st) || "REJECTED".equals(st)) {
+                continue;
+            }
+            LocalDateTime startDt = parseInterviewStart(iv);
+            if (startDt != null) {
+                LocalDate ivDate = startDt.toLocalDate();
+                if (!ivDate.isBefore(today) && !ivDate.isAfter(maxDate)) {
+                    long daysUntil = java.time.temporal.ChronoUnit.DAYS.between(today, ivDate);
+                    String slotText = CatalogData.formatInterviewTimeRange(iv.getDateTime(), iv.getEndDateTime());
+                    String dayLabel = daysUntil == 0 ? "today" : ("in " + daysUntil + " day(s)");
+                    String msg = "Upcoming interview #" + iv.getId() + " (" + iv.getTeacherName() + " · " + iv.getPartner()
+                            + ") on " + slotText + " — " + dayLabel + " (configured reminder: " + notificationLeadDays + "d before).";
+                    items.add(new NotificationItem(
+                            -iv.getId(),
+                            role,
+                            username.trim(),
+                            iv.getTeacherId(),
+                            iv.getPartner(),
+                            "INTERVIEW_REMINDER",
+                            "Upcoming Interview Reminder (" + dayLabel + ")",
+                            msg,
+                            slotText,
+                            false
+                    ));
+                }
+            }
+        }
+
+        long teacherId = "TEACHER".equals(role) ? teacherIdForUser(username.trim()) : -1L;
+        for (NotificationItem n : notifications) {
+            if ("STAFF".equals(role) || "ADMIN".equals(role)) {
+                items.add(n);
+            } else if ("TEACHER".equals(role)) {
+                if (n.teacherId() == teacherId || username.trim().equalsIgnoreCase(n.targetUser())) {
+                    items.add(n);
+                }
+            } else if ("PARTNER".equals(role)) {
+                if (isSamePartner(n.partner(), username.trim()) || username.trim().equalsIgnoreCase(n.targetUser())) {
+                    items.add(n);
+                }
+            }
+        }
+        return items;
+    }
+
+    private boolean isSamePartner(String partnerField, String partnerUsernameOrName) {
+        if (partnerField == null || partnerUsernameOrName == null) {
+            return false;
+        }
+        String pf = partnerField.trim();
+        String target = partnerUsernameOrName.trim();
+        if (pf.equalsIgnoreCase(target)) {
+            return true;
+        }
+        AppUser u = users.get(target);
+        if (u != null && u.getFullName() != null && pf.equalsIgnoreCase(u.getFullName().trim())) {
+            return true;
+        }
+        for (AppUser candidate : users.values()) {
+            if ("PARTNER".equals(candidate.getRole())
+                    && candidate.getFullName() != null
+                    && candidate.getFullName().trim().equalsIgnoreCase(pf)
+                    && candidate.getUsername().equalsIgnoreCase(target)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static LocalDateTime parseInterviewStart(String rawDateTime) {
+        if (rawDateTime == null || rawDateTime.isBlank()) {
+            return null;
+        }
+        String raw = rawDateTime.trim();
+        try {
+            return LocalDateTime.parse(raw);
+        } catch (DateTimeParseException ignored) {
+        }
+        try {
+            return LocalDateTime.parse(raw.replace(' ', 'T'));
+        } catch (DateTimeParseException ignored) {
+        }
+        return null;
+    }
+
+    public static LocalDateTime parseInterviewStart(Interview iv) {
+        if (iv == null || iv.getDateTime() == null || iv.getDateTime().isBlank()) {
+            return null;
+        }
+        String raw = iv.getDateTime().trim();
+        try {
+            return LocalDateTime.parse(raw);
+        } catch (DateTimeParseException ignored) {
+        }
+        try {
+            return LocalDateTime.parse(raw.replace(' ', 'T'));
+        } catch (DateTimeParseException ignored) {
+        }
+        return null;
+    }
+
+    public static LocalDateTime parseInterviewEnd(Interview iv) {
+        return parseInterviewEnd(iv, parseInterviewStart(iv));
+    }
+
+    public static LocalDateTime parseInterviewEnd(Interview iv, LocalDateTime fallbackStart) {
+        if (iv != null && iv.getEndDateTime() != null && !iv.getEndDateTime().isBlank()) {
+            String raw = iv.getEndDateTime().trim();
+            try {
+                return LocalDateTime.parse(raw);
+            } catch (DateTimeParseException ignored) {
+            }
+            try {
+                return LocalDateTime.parse(raw.replace(' ', 'T'));
+            } catch (DateTimeParseException ignored) {
+            }
+        }
+        return fallbackStart == null ? null : fallbackStart.plusMinutes(60);
+    }
+
+    private static String nowUtc7String() {
+        return LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) + " (UTC+7)";
+    }
+
+    private Path getSharedMediaDir() {
+        return Paths.get(System.getProperty("user.home", "."), ".tmver36_001", "shared_media");
     }
 }

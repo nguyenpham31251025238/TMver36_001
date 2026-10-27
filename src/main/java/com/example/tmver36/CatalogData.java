@@ -399,4 +399,90 @@ public final class CatalogData {
         String m = normalizeSearch(major);
         return d.contains(f) || m.contains(f) || f.contains(d) && !d.isEmpty() || f.contains(m) && !m.isEmpty();
     }
+
+    public static final List<String> SHORTLIST_FILTER_OPTIONS = List.of(
+            "All",
+            "Shortlisted",
+            "Not Shortlisted"
+    );
+
+    public static boolean isShortlistedDecision(String decision) {
+        if (decision == null || decision.isBlank()) {
+            return false;
+        }
+        String norm = decision.trim().toLowerCase(Locale.ROOT);
+        return norm.startsWith("shortlist") || norm.equals("proceed") || norm.startsWith("proceed ");
+    }
+
+    public static boolean matchesShortlistFilter(boolean isShortlisted, String filterValue) {
+        if (filterValue == null || filterValue.isBlank() || "All".equalsIgnoreCase(filterValue.trim())) {
+            return true;
+        }
+        String norm = filterValue.trim().toLowerCase(Locale.ROOT);
+        if (norm.equals("shortlisted") || norm.equals("shortlist")) {
+            return isShortlisted;
+        }
+        if (norm.contains("not") || norm.contains("unshortlisted")) {
+            return !isShortlisted;
+        }
+        return true;
+    }
+
+    public static String formatSalary(String rawSalary) {
+        if (rawSalary == null || rawSalary.isBlank()) {
+            return "$1,500 - $2,000";
+        }
+        String s = rawSalary.trim();
+        s = s.replaceAll("(?i)\\s*/\\s*mo(nth)?$", "").trim();
+        if (s.matches("^\\d+$")) {
+            try {
+                long amount = Long.parseLong(s);
+                return String.format(Locale.US, "$%,d", amount);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return s.isEmpty() ? "$1,500 - $2,000" : s;
+    }
+
+    public static String formatNationality(String rawNationality) {
+        if (rawNationality == null || rawNationality.isBlank()) {
+            return "International";
+        }
+        String trimmed = rawNationality.trim();
+        for (String country : WORLD_COUNTRIES_AZ) {
+            if (country.equalsIgnoreCase(trimmed)) {
+                return country;
+            }
+        }
+        return trimmed;
+    }
+
+    public static String formatAvailableDate(String rawDate) {
+        if (rawDate == null || rawDate.isBlank()) {
+            return "Immediate";
+        }
+        return rawDate.trim();
+    }
+
+    public static String formatInterviewTimeRange(String startRaw, String endRaw) {
+        if (startRaw == null || startRaw.isBlank()) {
+            return "Schedule pending (UTC+7)";
+        }
+        String s = startRaw.trim();
+        try {
+            java.time.LocalDateTime startDt = java.time.LocalDateTime.parse(s.length() > 16 ? s.substring(0, 16) : s);
+            java.time.LocalDateTime endDt;
+            if (endRaw != null && !endRaw.isBlank()) {
+                String e = endRaw.trim();
+                endDt = java.time.LocalDateTime.parse(e.length() > 16 ? e.substring(0, 16) : e);
+            } else {
+                endDt = startDt.plusMinutes(30);
+            }
+            java.time.format.DateTimeFormatter dateFmt = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+            java.time.format.DateTimeFormatter timeFmt = java.time.format.DateTimeFormatter.ofPattern("HH:mm");
+            return startDt.format(dateFmt) + " · " + startDt.format(timeFmt) + " - " + endDt.format(timeFmt) + " (UTC+7)";
+        } catch (Exception ignored) {
+            return s.contains("UTC+7") ? s : (s + " (UTC+7)");
+        }
+    }
 }

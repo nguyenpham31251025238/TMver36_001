@@ -61,6 +61,11 @@ public class AdminAccountsController {
     private void initialize() {
         resolveUnidentifiedCombos();
         configureTableColumns();
+        Parent root = FxNodes.rootOf(nav_AdminAccounts, nav_AdminLogs, accountTable);
+        ProfileCardBuilder.decorateScreen(root, STORE, () -> {
+            loadAccountsFromStore();
+            populateAssignAccountCombo();
+        });
         loadAccountsFromStore();
         populateAssignAccountCombo();
 

@@ -8,15 +8,22 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.PasswordField?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
 <HBox prefHeight="860" prefWidth="1280" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.LoginController">
   <VBox minWidth="440" prefWidth="520" spacing="28" style="-fx-background-image: url('@photo/bg_login.png'); -fx-background-size: cover; -fx-background-position: center;" styleClass="login-left">
     <HBox alignment="CENTER_LEFT" spacing="12">
-      <Label styleClass="brand-mark" text="TM" />
+      <ImageView fx:id="loginLogoView" fitHeight="38" fitWidth="38" pickOnBounds="true" preserveRatio="true">
+        <image>
+          <Image url="@logo.png" />
+        </image>
+      </ImageView>
       <Label styleClass="brand" text="TeacherMatch" />
     </HBox>
     <Region VBox.vgrow="ALWAYS" />
@@ -36,7 +43,14 @@
   </VBox>
   <VBox alignment="CENTER" spacing="12" styleClass="login-right" HBox.hgrow="ALWAYS">
     <VBox maxWidth="420" spacing="20">
-      <Label styleClass="badge,badge-green" text="WELCOME BACK" />
+      <HBox alignment="CENTER_LEFT" spacing="10">
+        <ImageView fitHeight="28" fitWidth="28" pickOnBounds="true" preserveRatio="true">
+          <image>
+            <Image url="@logo.png" />
+          </image>
+        </ImageView>
+        <Label styleClass="badge,badge-green" text="WELCOME BACK" />
+      </HBox>
       <Label styleClass="page-title" text="Login" />
       <Label styleClass="muted" text="Please select your designated role to access the appropriate workspace." wrapText="true" />
       <VBox spacing="7" HBox.hgrow="ALWAYS">
@@ -61,7 +75,13 @@
       </VBox>
       <VBox spacing="7">
         <Label styleClass="field-label" text="Password" />
-        <PasswordField fx:id="passwordField" promptText="Enter Password" />
+        <HBox alignment="CENTER_LEFT" spacing="8">
+          <StackPane HBox.hgrow="ALWAYS">
+            <PasswordField fx:id="passwordField" maxWidth="Infinity" promptText="Enter Password" />
+            <TextField fx:id="visiblePasswordField" managed="false" maxWidth="Infinity" promptText="Enter Password" visible="false" />
+          </StackPane>
+          <Button fx:id="togglePasswordButton" minWidth="68" onAction="#handleTogglePasswordVisibility" styleClass="secondary,button-sm" text="Show" />
+        </HBox>
       </VBox>
       <HBox alignment="CENTER_LEFT" spacing="10">
         <CheckBox fx:id="rememberMeCheck" text="Remember me (keep signed-in session token)" />

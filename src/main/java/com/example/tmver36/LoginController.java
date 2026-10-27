@@ -15,6 +15,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
+import javafx.scene.image.ImageView;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
@@ -58,6 +59,9 @@ public class LoginController {
     @FXML private ComboBox<String> demoRole;
     @FXML private TextField emailField;
     @FXML private PasswordField passwordField;
+    @FXML private TextField visiblePasswordField;
+    @FXML private Button togglePasswordButton;
+    @FXML private ImageView loginLogoView;
     @FXML private CheckBox rememberMeCheck;
     @FXML private Label sessionHintLabel;
     @FXML private Button loginButton;
@@ -65,6 +69,8 @@ public class LoginController {
     // Optional aliases for compatibility
     @FXML private TextField usernameField;
     @FXML private ComboBox<String> roleCombo;
+
+    private boolean passwordVisible = false;
 
     @FXML
     private void initialize() {
@@ -75,7 +81,39 @@ public class LoginController {
         if (loginButton != null) {
             loginButton.setDefaultButton(true);
         }
+        if (passwordField != null && visiblePasswordField != null) {
+            passwordField.textProperty().bindBidirectional(visiblePasswordField.textProperty());
+            setPasswordVisible(false);
+        }
         applyRememberedSessionToForm();
+    }
+
+    @FXML
+    public void handleTogglePasswordVisibility(ActionEvent event) {
+        setPasswordVisible(!passwordVisible);
+    }
+
+    public void setPasswordVisible(boolean visible) {
+        this.passwordVisible = visible;
+        if (passwordField == null || visiblePasswordField == null) {
+            return;
+        }
+        int caret = visible ? passwordField.getCaretPosition() : visiblePasswordField.getCaretPosition();
+        passwordField.setVisible(!visible);
+        passwordField.setManaged(!visible);
+        visiblePasswordField.setVisible(visible);
+        visiblePasswordField.setManaged(visible);
+        if (togglePasswordButton != null) {
+            togglePasswordButton.setText(visible ? "Hide" : "Show");
+        }
+        TextField active = visible ? visiblePasswordField : passwordField;
+        if (active.getText() != null) {
+            active.positionCaret(Math.min(Math.max(0, caret), active.getText().length()));
+        }
+    }
+
+    public boolean isPasswordVisible() {
+        return passwordVisible;
     }
 
     private void applyRememberedSessionToForm() {
@@ -116,6 +154,16 @@ public class LoginController {
         return demoRole != null ? demoRole : roleCombo;
     }
 
+    private String currentPasswordText() {
+        if (passwordField != null && passwordField.getText() != null) {
+            return passwordField.getText();
+        }
+        if (visiblePasswordField != null && visiblePasswordField.getText() != null) {
+            return visiblePasswordField.getText();
+        }
+        return "";
+    }
+
     @FXML
     private void handleLoginAction(ActionEvent event) {
         TextField userInput = activeUserField();
@@ -124,9 +172,7 @@ public class LoginController {
         String username = userInput == null || userInput.getText() == null
                 ? ""
                 : userInput.getText().trim();
-        String password = passwordField == null || passwordField.getText() == null
-                ? ""
-                : passwordField.getText();
+        String password = currentPasswordText();
         String selectedRole = roleInput == null ? null : roleInput.getValue();
 
         String expectedRole = mapSelectedRole(selectedRole);
@@ -315,6 +361,7 @@ public class LoginController {
             Scene currentScene = source.getScene();
             Window window = currentScene.getWindow();
             if (window instanceof Stage stage) {
+                ProfileCardBuilder.applyAppIcon(stage);
                 Scene nextScene = new Scene(root, currentScene.getWidth(), currentScene.getHeight());
                 stage.setTitle(screenTitle(fxmlFile));
                 stage.setScene(nextScene);

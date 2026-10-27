@@ -331,6 +331,114 @@ class FxmlAndNavigationTest {
         });
     }
 
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void allElevenFeedbackTasksUiAndControllerVerification() throws Exception {
+        runOnFxThread(() -> {
+            LoginController.STORE.resetToSeedData();
+
+            // Task 6 & Task 11: Logo on Login + Show/Hide Password toggle (default hidden, preserves text)
+            assertNotNull(ProfileCardBuilder.loadAppLogo(), "TeacherMatch brand logo image must load");
+            FXMLLoader loginLoader = new FXMLLoader(LoginController.class.getResource("Login.fxml"));
+            Parent loginRoot = loginLoader.load();
+            new Scene(loginRoot, 1280, 800);
+            LoginController loginCtrl = loginLoader.getController();
+            PasswordField pwField = getField(loginCtrl, "passwordField", PasswordField.class);
+            TextField visiblePwField = getField(loginCtrl, "visiblePasswordField", TextField.class);
+            Button togglePwBtn = getField(loginCtrl, "togglePasswordButton", Button.class);
+            assertNotNull(visiblePwField);
+            assertNotNull(togglePwBtn);
+            assertFalse(loginCtrl.isPasswordVisible(), "Password must be hidden by default");
+            assertTrue(pwField.isVisible());
+            assertFalse(visiblePwField.isVisible());
+
+            pwField.setText("secretPass!2026");
+            togglePwBtn.fire();
+            assertTrue(loginCtrl.isPasswordVisible(), "Clicking Show must reveal plain password field");
+            assertEquals("secretPass!2026", visiblePwField.getText(), "Revealing password must preserve typed text");
+            visiblePwField.setText("secretPass!2026_edited");
+            togglePwBtn.fire();
+            assertFalse(loginCtrl.isPasswordVisible(), "Clicking Hide must return to masked PasswordField");
+            assertEquals("secretPass!2026_edited", pwField.getText(), "Hiding password must preserve edited text");
+
+            // Task 1, Task 4, Task 5: StaffDashboard Reload button, Shortlist filter, Pagination, and Degree removed from cards
+            LoginController.setCurrentSession("staff", "STAFF");
+            FXMLLoader staffLoader = new FXMLLoader(LoginController.class.getResource("StaffDashboard.fxml"));
+            Parent staffRoot = staffLoader.load();
+            new Scene(staffRoot, 1280, 800);
+            StaffDashboardController staffCtrl = staffLoader.getController();
+            assertNotNull(staffRoot.lookup("#reloadDataButton"), "Topbar must include Reload Data button");
+            assertNotNull(staffRoot.lookup("#reloadStatusLabel"), "Topbar must include Reload status badge");
+
+            ComboBox<String> staffShortlistFilter = getField(staffCtrl, "shortlistFilter", ComboBox.class);
+            assertNotNull(staffShortlistFilter);
+            assertEquals(List.of("All", "Shortlisted", "Not Shortlisted"), staffShortlistFilter.getItems());
+
+            FlowPane staffGrid = getField(staffCtrl, "cardGridPane", FlowPane.class);
+            assertEquals(3, staffGrid.getChildren().size());
+            // Verify Degree ("Bachelor's Degree" / "Master's Degree") is NOT redundantly shown on Candidate Profile Cards
+            for (javafx.scene.Node cardNode : staffGrid.getChildren()) {
+                if (cardNode instanceof Parent cardParent) {
+                    boolean hasRedundantDegree = FxNodes.findAll(cardParent, Label.class).stream()
+                            .map(Label::getText)
+                            .anyMatch(t -> t != null && (t.contains("Bachelor's Degree") || t.contains("Master's Degree")));
+                    assertFalse(hasRedundantDegree, "Candidate Profile Card must not display redundant degree text");
+                }
+            }
+
+            // Task 4: PartnerDashboard Shortlist filter + toggle shortlist compatibility with search & pagination
+            LoginController.setCurrentSession("partner", "PARTNER");
+            LoginController.STORE.togglePartnerShortlist("partner", 1L);
+            FXMLLoader partnerLoader = new FXMLLoader(LoginController.class.getResource("PartnerDashboard.fxml"));
+            Parent partnerRoot = partnerLoader.load();
+            new Scene(partnerRoot, 1280, 800);
+            PartnerDashboardController partnerCtrl = partnerLoader.getController();
+            ComboBox<String> partnerShortlist = getField(partnerCtrl, "shortlistFilter", ComboBox.class);
+            FlowPane partnerGrid = getField(partnerCtrl, "partnerCardGrid", FlowPane.class);
+            assertNotNull(partnerShortlist);
+            assertEquals(2, partnerGrid.getChildren().size(), "Partner sees 2 shared READY teachers initially");
+
+            partnerShortlist.setValue("Shortlisted");
+            assertEquals(1, partnerGrid.getChildren().size(), "Only 1 teacher is initially shortlisted by partner");
+            partnerShortlist.setValue("Not Shortlisted");
+            assertEquals(1, partnerGrid.getChildren().size(), "1 shared teacher is not shortlisted");
+            partnerShortlist.setValue("All");
+            assertEquals(2, partnerGrid.getChildren().size());
+
+            // Task 7 & Task 9: InterviewWorkspace schedule adjustment & Staff marking Interview Successful
+            LoginController.setCurrentSession("staff", "STAFF");
+            FXMLLoader iwLoader = new FXMLLoader(LoginController.class.getResource("InterviewWorkspace.fxml"));
+            Parent iwRoot = iwLoader.load();
+            new Scene(iwRoot, 1280, 800);
+            InterviewWorkspaceController iwCtrl = iwLoader.getController();
+            Button rescheduleBtn = getField(iwCtrl, "rescheduleInterviewButton", Button.class);
+            Button markSuccessBtn = getField(iwCtrl, "markInterviewSuccessButton", Button.class);
+            TextField staffNotes = getField(iwCtrl, "staffResultNotesField", TextField.class);
+            assertNotNull(rescheduleBtn);
+            assertNotNull(markSuccessBtn);
+            staffNotes.setText("Excellent demo lesson; passed interview.");
+            markSuccessBtn.fire();
+            assertTrue(LoginController.STORE.interviews().stream()
+                    .anyMatch(i -> "Interview Successful".equals(i.getResult())),
+                    "Mark Interview Successful button must persist result to PortalStore");
+
+            // Task 8: TeacherSchedule & PartnerInterview configurable notification lead days & notification feed
+            LoginController.setCurrentSession("teacher", "TEACHER");
+            FXMLLoader tsLoader = new FXMLLoader(LoginController.class.getResource("TeacherSchedule.fxml"));
+            Parent tsRoot = tsLoader.load();
+            new Scene(tsRoot, 1280, 800);
+            TeacherScheduleController tsCtrl = tsLoader.getController();
+            ComboBox<Integer> teacherLeadCombo = getField(tsCtrl, "leadDaysCombo", ComboBox.class);
+            VBox teacherNotesBox = getField(tsCtrl, "teacherNotificationsBox", VBox.class);
+            assertNotNull(teacherLeadCombo);
+            assertNotNull(teacherNotesBox);
+            teacherLeadCombo.setValue(7);
+            assertEquals(7, LoginController.STORE.getNotificationLeadDays());
+            assertFalse(teacherNotesBox.getChildren().isEmpty(), "Teacher notification feed must display result/reminder items");
+        });
+    }
+
     private void verifyRoleLoginAndNavigation(
             String username,
             String password,

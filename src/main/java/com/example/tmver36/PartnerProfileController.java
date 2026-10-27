@@ -6,6 +6,7 @@ import com.example.tmver36.service.PortalStore;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
@@ -67,6 +68,12 @@ public class PartnerProfileController {
         configureCandidateSelector();
         bindNavigation();
         bindDocumentButtons();
+        Parent root = FxNodes.rootOf(nav_PartnerProfile, nav_PartnerDashboard, saveShortlistButton, partnerDocsTable);
+        ProfileCardBuilder.decorateScreen(root, STORE, () -> {
+            loadSelectedCandidate();
+            configureCandidateSelector();
+            refreshProfileText();
+        });
         if (saveShortlistButton != null) saveShortlistButton.setOnAction(e -> saveEvaluation());
         if (nav_PartnerInterview__2 != null) {
             nav_PartnerInterview__2.setOnAction(e -> {
@@ -143,10 +150,12 @@ public class PartnerProfileController {
     private void openCategoryDoc(String category) {
         if (currentTeacher == null) return;
         TeacherDocument doc = ProfileCardBuilder.findDocumentByCategory(STORE, currentTeacher.getId(), category);
-        if (doc != null && STORE.openDocument(currentPartner(), doc)) {
+        if (ProfileCardBuilder.openDocumentWithAuthAndPlayback(STORE, currentPartner(), doc, partnerDocsTable)) {
             return;
         }
-        showError("Document unavailable", "No " + category + " file is available for " + safe(currentTeacher.getName()) + ".");
+        if (doc == null) {
+            showError("Document unavailable", "No " + category + " file is available for " + safe(currentTeacher.getName()) + ".");
+        }
     }
 
     private void refreshProfileText() {
@@ -179,10 +188,12 @@ public class PartnerProfileController {
             );
         }
         if (candidateSalaryLabel != null) {
+            String updatedAt = nonBlank(currentTeacher.getUpdatedAt(), "UTC+7");
             candidateSalaryLabel.setText(
-                    "Expected Salary: " + nonBlank(currentTeacher.getExpectedSalary(), "$1,500 - $2,000")
+                    "Expected Salary: " + CatalogData.formatSalary(currentTeacher.getExpectedSalary())
                             + " / month · Available: " + nonBlank(currentTeacher.getAvailableFrom(), "Immediate")
                             + " · Location: " + nonBlank(currentTeacher.getLocation(), "Vietnam")
+                            + " · Updated: " + updatedAt
             );
         }
         if (accessBadgeLabel != null) {
@@ -234,7 +245,7 @@ public class PartnerProfileController {
 
             Button openBtn = new Button(doc.getCategory().toLowerCase().contains("video") ? "Watch" : "Open");
             openBtn.getStyleClass().addAll("button-sm", "secondary");
-            openBtn.setOnAction(e -> STORE.openDocument(currentPartner(), doc));
+            openBtn.setOnAction(e -> ProfileCardBuilder.openDocumentWithAuthAndPlayback(STORE, currentPartner(), doc, openBtn));
 
             Button dlBtn = new Button("Download");
             dlBtn.getStyleClass().addAll("button-sm", "secondary");

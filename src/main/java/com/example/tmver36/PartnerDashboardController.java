@@ -5,6 +5,7 @@ import com.example.tmver36.model.TeacherProfile;
 import com.example.tmver36.service.PortalStore;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckMenuItem;
@@ -26,6 +27,7 @@ import java.util.stream.Collectors;
 public class PartnerDashboardController {
 
     private static final PortalStore STORE = LoginController.STORE;
+    private static final int PAGE_SIZE = 6;
 
     @FXML private Button nav_PartnerDashboard;
     @FXML private Button nav_PartnerProfile;
@@ -42,29 +44,58 @@ public class PartnerDashboardController {
     @FXML private MenuButton certificateMenuButton;
     @FXML private ComboBox<String> subjectFilter;
     @FXML private ComboBox<String> salaryFilter;
+    @FXML private ComboBox<String> shortlistFilter;
     @FXML private Button searchGrantedButton;
     @FXML private Button clearPartnerFiltersButton;
     @FXML private Label countNote;
     @FXML private FlowPane partnerCardGrid;
+    @FXML private Button prevPageButton;
+    @FXML private Button nextPageButton;
+    @FXML private Label pageInfoLabel;
 
     private final Set<String> selectedCertificates = new LinkedHashSet<>();
     private final List<CheckMenuItem> certItems = new ArrayList<>();
+    private List<TeacherProfile> matchedTeachers = new ArrayList<>();
     private boolean updatingNationality;
+    private int currentPage = 1;
 
     @FXML
     private void initialize() {
+        Parent root = FxNodes.rootOf(nav_PartnerDashboard, searchGrantedButton, partnerCardGrid, grantedSearch);
         configureFilters();
         bindNavigation();
+        ProfileCardBuilder.decorateScreen(root, STORE, this::applySearch);
 
-        if (searchGrantedButton != null) searchGrantedButton.setOnAction(e -> applySearch());
+        if (searchGrantedButton != null) searchGrantedButton.setOnAction(e -> { currentPage = 1; applySearch(); });
         if (clearPartnerFiltersButton != null) clearPartnerFiltersButton.setOnAction(e -> resetFilters());
         if (grantedSearch != null) {
-            grantedSearch.setOnAction(e -> applySearch());
-            grantedSearch.textProperty().addListener((obs, oldV, newV) -> applySearch());
+            grantedSearch.setOnAction(e -> { currentPage = 1; applySearch(); });
+            grantedSearch.textProperty().addListener((obs, oldV, newV) -> { currentPage = 1; applySearch(); });
         }
-        if (experienceFilter != null) experienceFilter.setOnAction(e -> applySearch());
-        if (subjectFilter != null) subjectFilter.setOnAction(e -> applySearch());
-        if (salaryFilter != null) salaryFilter.setOnAction(e -> applySearch());
+        if (experienceFilter != null) experienceFilter.setOnAction(e -> { currentPage = 1; applySearch(); });
+        if (subjectFilter != null) subjectFilter.setOnAction(e -> { currentPage = 1; applySearch(); });
+        if (salaryFilter != null) salaryFilter.setOnAction(e -> { currentPage = 1; applySearch(); });
+        if (shortlistFilter != null) {
+            shortlistFilter.setOnAction(e -> { currentPage = 1; applySearch(); });
+            shortlistFilter.valueProperty().addListener((obs, o, n) -> { currentPage = 1; applySearch(); });
+        }
+        if (prevPageButton != null) {
+            prevPageButton.setOnAction(e -> {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderPartnerCards(matchedTeachers, STORE.visibleTeachers(currentPartner(), "PARTNER").size());
+                }
+            });
+        }
+        if (nextPageButton != null) {
+            nextPageButton.setOnAction(e -> {
+                int totalPages = Math.max(1, (int) Math.ceil((double) matchedTeachers.size() / PAGE_SIZE));
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderPartnerCards(matchedTeachers, STORE.visibleTeachers(currentPartner(), "PARTNER").size());
+                }
+            });
+        }
 
         applySearch();
     }
@@ -84,10 +115,11 @@ public class PartnerDashboardController {
                     } finally {
                         updatingNationality = false;
                     }
+                    currentPage = 1;
                     applySearch();
                 });
             }
-            nationalityFilter.setOnAction(e -> applySearch());
+            nationalityFilter.setOnAction(e -> { currentPage = 1; applySearch(); });
         }
         if (experienceFilter != null) {
             experienceFilter.getItems().setAll(CatalogData.EXPERIENCE_FILTER_OPTIONS);
@@ -101,6 +133,10 @@ public class PartnerDashboardController {
             salaryFilter.getItems().setAll(CatalogData.EXPECTED_SALARY_FILTER_OPTIONS);
             salaryFilter.setValue("All");
         }
+        if (shortlistFilter != null) {
+            shortlistFilter.getItems().setAll(CatalogData.SHORTLIST_FILTER_OPTIONS);
+            shortlistFilter.setValue("All");
+        }
         if (certificateMenuButton != null) {
             certificateMenuButton.getItems().clear();
             certItems.clear();
@@ -112,6 +148,7 @@ public class PartnerDashboardController {
                     certificateMenuButton.setText(selectedCertificates.isEmpty()
                             ? "All certificates"
                             : String.join(", ", selectedCertificates));
+                    currentPage = 1;
                     applySearch();
                 });
                 certItems.add(item);
@@ -135,9 +172,11 @@ public class PartnerDashboardController {
         if (experienceFilter != null) experienceFilter.setValue("All");
         if (subjectFilter != null) subjectFilter.setValue("All");
         if (salaryFilter != null) salaryFilter.setValue("All");
+        if (shortlistFilter != null) shortlistFilter.setValue("All");
         selectedCertificates.clear();
         for (CheckMenuItem item : certItems) item.setSelected(false);
         if (certificateMenuButton != null) certificateMenuButton.setText("All certificates");
+        currentPage = 1;
         applySearch();
     }
 
@@ -165,9 +204,11 @@ public class PartnerDashboardController {
         String experience = selected(experienceFilter);
         String majorOrDegree = selected(subjectFilter);
         String salary = selected(salaryFilter);
+        String shortlistSel = selected(shortlistFilter);
+        String partner = currentPartner();
 
-        List<TeacherProfile> visible = STORE.visibleTeachers(currentPartner(), "PARTNER");
-        List<TeacherProfile> matched = visible.stream().filter(t -> {
+        List<TeacherProfile> visible = STORE.visibleTeachers(partner, "PARTNER");
+        matchedTeachers = visible.stream().filter(t -> {
             String haystack = (safe(t.getName()) + " " + safe(t.getCertificates()) + " "
                     + safe(t.getLocation()) + " " + safe(t.getNationality()) + " "
                     + safe(t.getDegree()) + " " + safe(t.getMajor()) + " " + safe(t.getExpectedSalary()))
@@ -178,21 +219,36 @@ public class PartnerDashboardController {
             if (!selectedCertificates.isEmpty() && !CatalogData.matchesCertificatesFilter(t.getCertificates(), selectedCertificates)) return false;
             if (!CatalogData.matchesMajorOrDegreeFilter(t.getDegree(), safe(t.getMajor()).isBlank() ? t.getSubject() : t.getMajor(), majorOrDegree)) return false;
             if (!CatalogData.matchesSalaryFilter(t.getExpectedSalary(), salary)) return false;
+            boolean isShortlisted = STORE.isTeacherShortlistedByPartner(partner, t.getId());
+            if (!CatalogData.matchesShortlistFilter(isShortlisted, shortlistSel)) return false;
             return true;
         }).collect(Collectors.toList());
 
-        renderPartnerCards(matched);
-        if (countNote != null) {
-            countNote.setText("Showing " + matched.size() + " of " + visible.size() + " shared teacher profile(s) available to this partner.");
-        }
+        renderPartnerCards(matchedTeachers, visible.size());
     }
 
-    private void renderPartnerCards(List<TeacherProfile> teachers) {
+    private void renderPartnerCards(List<TeacherProfile> teachers, int totalVisibleCount) {
         if (partnerCardGrid == null) return;
         partnerCardGrid.getChildren().clear();
 
+        int total = teachers.size();
+        int totalPages = Math.max(1, (int) Math.ceil((double) total / PAGE_SIZE));
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+        int fromIdx = (currentPage - 1) * PAGE_SIZE;
+        int toIdx = Math.min(total, fromIdx + PAGE_SIZE);
+        List<TeacherProfile> pageSlice = total == 0 ? List.of() : teachers.subList(fromIdx, toIdx);
+
+        if (prevPageButton != null) prevPageButton.setDisable(currentPage <= 1);
+        if (nextPageButton != null) nextPageButton.setDisable(currentPage >= totalPages);
+        if (pageInfoLabel != null) pageInfoLabel.setText("Page " + currentPage + " / " + totalPages);
+        if (countNote != null) {
+            countNote.setText("Showing " + pageSlice.size() + " (of " + total + " matched / " + totalVisibleCount
+                    + " shared) teacher profile(s) available to this partner.");
+        }
+
         String partner = currentPartner();
-        for (TeacherProfile teacher : teachers) {
+        for (TeacherProfile teacher : pageSlice) {
             String[] eval = STORE.partnerEvaluation(partner, teacher.getId());
             String evalBadge = (eval != null && eval.length > 0 && eval[0] != null) ? eval[0] : "";
             VBox card = ProfileCardBuilder.buildPartnerTeacherCard(
@@ -207,12 +263,16 @@ public class PartnerDashboardController {
                     () -> {
                         PartnerInterviewController.setPreselectedTeacherId(teacher.getId());
                         navigate("PartnerInterview.fxml");
+                    },
+                    () -> {
+                        STORE.togglePartnerShortlist(partner, teacher.getId());
+                        applySearch();
                     }
             );
             partnerCardGrid.getChildren().add(card);
         }
 
-        if (teachers.isEmpty()) {
+        if (pageSlice.isEmpty()) {
             Label empty = new Label("No shared teacher profiles match the selected filters.");
             empty.getStyleClass().add("muted");
             VBox box = new VBox(empty);
@@ -223,9 +283,11 @@ public class PartnerDashboardController {
 
     private void openDoc(TeacherProfile teacher, String category) {
         TeacherDocument doc = ProfileCardBuilder.findDocumentByCategory(STORE, teacher.getId(), category);
-        if (doc == null || !STORE.openDocument(currentPartner(), doc)) {
-            LoginController.showAlert(Alert.AlertType.INFORMATION, "Document Preview",
-                    "No " + category + " file is currently available for " + teacher.getName() + ".");
+        if (!ProfileCardBuilder.openDocumentWithAuthAndPlayback(STORE, currentPartner(), doc, partnerCardGrid)) {
+            if (doc == null) {
+                LoginController.showAlert(Alert.AlertType.INFORMATION, "Document Preview",
+                        "No " + category + " file is currently available for " + teacher.getName() + ".");
+            }
         }
     }
 

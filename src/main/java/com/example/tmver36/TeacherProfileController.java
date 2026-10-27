@@ -75,6 +75,8 @@ public class TeacherProfileController {
         configureCatalogControls();
         wireNavigation();
         loadProfileIntoForm();
+        Parent root = sourceRoot();
+        ProfileCardBuilder.decorateScreen(root, STORE, this::loadProfileIntoForm);
         if (uploadAvatarButton != null) uploadAvatarButton.setOnAction(e -> chooseAndUploadAvatar());
         if (saveDraftButton != null) saveDraftButton.setOnAction(e -> saveDraft(true));
         if (submitProfileButton != null) submitProfileButton.setOnAction(e -> submitForReview());
@@ -317,6 +319,7 @@ public class TeacherProfileController {
         if (avatarContainer != null) {
             avatarContainer.getChildren().setAll(ProfileCardBuilder.createAvatarNode(profile, 60));
         }
+        ProfileCardBuilder.updateAvatarSlot(sourceRoot(), profile, 50);
         if (statusBadgeLabel != null) {
             statusBadgeLabel.setText(CatalogData.formatStatusBadge(profile.getStatus()));
             statusBadgeLabel.getStyleClass().setAll("badge", CatalogData.badgeStyleForStatus(profile.getStatus()));

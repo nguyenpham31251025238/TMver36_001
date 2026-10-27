@@ -4,6 +4,7 @@
 <?import javafx.collections.FXCollections?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.DatePicker?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Tab?>
@@ -47,8 +48,8 @@
         <HBox alignment="CENTER_LEFT" spacing="12" styleClass="topbar">
           <Label styleClass="breadcrumb" text="Hiring Partner / Shared Profiles" />
           <Region HBox.hgrow="ALWAYS" />
-          <Label styleClass="badge,badge-gray" text="DEMO" />
-          <Label styleClass="muted" text="14/10/2026" />
+          <Label styleClass="badge,badge-gray" text="LIVE" />
+          <Label styleClass="muted" text="27/10/2026" />
           <Label alignment="CENTER" minHeight="36" minWidth="36" styleClass="avatar-small" text="BS" />
         </HBox>
       </top>
@@ -59,10 +60,19 @@
               <HBox alignment="CENTER_LEFT" spacing="12">
                 <VBox spacing="7">
                   <Label styleClass="page-title" text="Interviews &amp; Results" />
-                  <Label styleClass="muted" text="Select teacher's available time and send evaluation post-interview." wrapText="true" />
+                  <Label styleClass="muted" text="Select teacher's available time, adjust schedule slots with conflict checking, and review results." wrapText="true" />
                 </VBox>
                 <Region HBox.hgrow="ALWAYS" />
               </HBox>
+              <VBox spacing="10" styleClass="card">
+                <HBox alignment="CENTER_LEFT" spacing="12">
+                  <Label styleClass="section-title" text="Interview Reminders &amp; Notifications" />
+                  <Region HBox.hgrow="ALWAYS" />
+                  <Label styleClass="field-label" text="Notify before (days):" />
+                  <ComboBox fx:id="leadDaysCombo" prefWidth="95" />
+                </HBox>
+                <VBox fx:id="partnerNotificationsBox" spacing="6" />
+              </VBox>
               <TabPane tabClosingPolicy="UNAVAILABLE">
                 <Tab text="Interview Request">
                   <content>
@@ -104,7 +114,7 @@
                         </HBox>
                         <VBox spacing="7">
                           <Label styleClass="field-label" text="Message to teacher" />
-                          <TextArea prefHeight="92" promptText="Interview content / preparation requests..." text="" wrapText="true" />
+                          <TextArea prefHeight="76" promptText="Interview content / preparation requests..." text="" wrapText="true" />
                         </VBox>
                         <HBox alignment="CENTER_LEFT" spacing="12">
                           <Region HBox.hgrow="ALWAYS" />
@@ -112,46 +122,70 @@
                         </HBox>
                       </VBox>
                       <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
-                        <Label styleClass="section-title" text="Track requests" />
+                        <Label styleClass="section-title" text="Adjust / Reschedule Interview Time Slot (UTC+7)" />
+                        <HBox alignment="CENTER_LEFT" spacing="12">
+                          <VBox spacing="7">
+                            <Label styleClass="field-label" text="Date" />
+                            <DatePicker fx:id="rescheduleDatePicker" promptText="Select Date" />
+                          </VBox>
+                          <VBox spacing="7" HBox.hgrow="ALWAYS">
+                            <Label styleClass="field-label" text="Start Time (UTC+7)" />
+                            <ComboBox fx:id="rescheduleFromCombo" editable="true" maxWidth="Infinity" prefWidth="150">
+                              <items>
+                                <FXCollections fx:factory="observableArrayList">
+                                  <String fx:value="09:00" />
+                                  <String fx:value="10:00" />
+                                  <String fx:value="14:00" />
+                                  <String fx:value="15:00" />
+                                  <String fx:value="16:00" />
+                                </FXCollections>
+                              </items>
+                              <value>
+                                <String fx:value="14:00" />
+                              </value>
+                            </ComboBox>
+                          </VBox>
+                          <VBox spacing="7" HBox.hgrow="ALWAYS">
+                            <Label styleClass="field-label" text="End Time (UTC+7)" />
+                            <ComboBox fx:id="rescheduleToCombo" editable="true" maxWidth="Infinity" prefWidth="150">
+                              <items>
+                                <FXCollections fx:factory="observableArrayList">
+                                  <String fx:value="09:30" />
+                                  <String fx:value="10:30" />
+                                  <String fx:value="14:30" />
+                                  <String fx:value="15:30" />
+                                  <String fx:value="16:30" />
+                                </FXCollections>
+                              </items>
+                              <value>
+                                <String fx:value="14:30" />
+                              </value>
+                            </ComboBox>
+                          </VBox>
+                          <VBox alignment="BOTTOM_LEFT" spacing="7">
+                            <Label styleClass="field-label" text=" " />
+                            <Button fx:id="rescheduleInterviewButton" styleClass="secondary" text="Reschedule Selected Interview" />
+                          </VBox>
+                        </HBox>
+                      </VBox>
+                      <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
+                        <Label styleClass="section-title" text="Track requests &amp; official results" />
                         <VBox fx:id="requestsTable" spacing="0" styleClass="table">
                           <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-header">
                             <VBox alignment="CENTER_LEFT" maxWidth="210" minWidth="210" prefWidth="210" spacing="0">
                               <Label maxWidth="194" styleClass="table-head" text="TEACHER" wrapText="true" />
                             </VBox>
                             <VBox alignment="CENTER_LEFT" maxWidth="260" minWidth="260" prefWidth="260" spacing="0">
-                              <Label maxWidth="244" styleClass="table-head" text="TIME" wrapText="true" />
+                              <Label maxWidth="244" styleClass="table-head" text="TIME (UTC+7)" wrapText="true" />
                             </VBox>
                             <VBox alignment="CENTER_LEFT" maxWidth="250" minWidth="250" prefWidth="250" spacing="0">
-                              <Label maxWidth="234" styleClass="table-head" text="STATUS" wrapText="true" />
+                              <Label maxWidth="234" styleClass="table-head" text="STATUS / RESULT" wrapText="true" />
                             </VBox>
                             <VBox alignment="CENTER_LEFT" maxWidth="250" minWidth="250" prefWidth="250" spacing="0">
                               <Label maxWidth="234" styleClass="table-head" text="LINK" wrapText="true" />
                             </VBox>
                           </HBox>
                           <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
-                            <VBox alignment="CENTER_LEFT" maxWidth="210" minWidth="210" prefWidth="210" spacing="0">
-                              <Label maxWidth="194" styleClass="table-text" text="Emily Martin" wrapText="true" />
-                            </VBox>
-                            <VBox alignment="CENTER_LEFT" maxWidth="260" minWidth="260" prefWidth="260" spacing="0">
-                              <Label maxWidth="244" styleClass="table-text" text="16/10 · 14:00" wrapText="true" />
-                            </VBox>
-                            <VBox alignment="CENTER_LEFT" maxWidth="250" minWidth="250" prefWidth="250" spacing="0">
-                              <Label styleClass="badge,badge-amber" text="Awaiting confirmation" />
-                            </VBox>
-                            <VBox alignment="CENTER_LEFT" maxWidth="250" minWidth="250" prefWidth="250" spacing="0">
-                              <Label maxWidth="234" styleClass="table-text" text="Available after schedule finalized" wrapText="true" />
-                            </VBox>
-                          </HBox>
-                          <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
-                            <VBox alignment="CENTER_LEFT" maxWidth="210" minWidth="210" prefWidth="210" spacing="0">
-                              <Label maxWidth="194" styleClass="table-text" text="Daniel Walker" wrapText="true" />
-                            </VBox>
-                            <VBox alignment="CENTER_LEFT" maxWidth="260" minWidth="260" prefWidth="260" spacing="0">
-                              <Label maxWidth="244" styleClass="table-text" text="15/10 · 10:00" wrapText="true" />
-                            </VBox>
-                            <VBox alignment="CENTER_LEFT" maxWidth="250" minWidth="250" prefWidth="250" spacing="0">
-                              <Label styleClass="badge,badge-green" text="Confirmed" />
-                            </VBox>
                             <VBox alignment="CENTER_LEFT" maxWidth="250" minWidth="250" prefWidth="250" spacing="0">
                               <Button fx:id="openPartnerMeetButton" styleClass="secondary" text="Open demo Meet link" />
                             </VBox>
@@ -168,17 +202,7 @@
                         <Label styleClass="section-title" text="Post-interview results" />
                         <VBox spacing="7" HBox.hgrow="ALWAYS">
                           <Label styleClass="field-label" text="Interview" />
-                          <ComboBox fx:id="interviewSelector" maxWidth="Infinity" prefWidth="500">
-                            <items>
-                              <FXCollections fx:factory="observableArrayList">
-                                <String fx:value="Daniel Walker · 15/10/2026" />
-                                <String fx:value="Emily Martin · 16/10/2026" />
-                              </FXCollections>
-                            </items>
-                            <value>
-                              <String fx:value="Daniel Walker · 15/10/2026" />
-                            </value>
-                          </ComboBox>
+                          <ComboBox fx:id="interviewSelector" maxWidth="Infinity" prefWidth="500" />
                         </VBox>
                         <HBox alignment="CENTER_LEFT" spacing="12">
                           <VBox spacing="7" HBox.hgrow="ALWAYS">

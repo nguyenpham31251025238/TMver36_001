@@ -2,6 +2,7 @@ package com.example.tmver36;
 
 import com.example.tmver36.model.AvailabilitySlot;
 import com.example.tmver36.model.Interview;
+import com.example.tmver36.model.NotificationItem;
 import com.example.tmver36.model.TeacherProfile;
 import com.example.tmver36.service.PortalStore;
 import javafx.fxml.FXML;
@@ -11,6 +12,7 @@ import javafx.scene.Parent;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.DatePicker;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
@@ -22,11 +24,13 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-/** Partner interview requests and feedback backed by PortalStore (PartnerInterview.fxml). */
+/** Partner interview requests, schedule adjustment, notifications, and feedback backed by PortalStore (PartnerInterview.fxml). */
 public class PartnerInterviewController {
 
     private static final PortalStore STORE = LoginController.STORE;
@@ -37,10 +41,17 @@ public class PartnerInterviewController {
     @FXML private Button nav_PartnerInterview;
     @FXML private Button nav_Login;
 
+    @FXML private ComboBox<Integer> leadDaysCombo;
+    @FXML private VBox partnerNotificationsBox;
+
     @FXML private ComboBox<String> requestedSlot;
     @FXML private ComboBox<TeacherProfile> teacherSelector;
     @FXML private TextField interviewerField;
     @FXML private Button requestInterviewButton;
+    @FXML private DatePicker rescheduleDatePicker;
+    @FXML private ComboBox<String> rescheduleFromCombo;
+    @FXML private ComboBox<String> rescheduleToCombo;
+    @FXML private Button rescheduleInterviewButton;
     @FXML private Button openPartnerMeetButton;
     @FXML private VBox requestsTable;
 
@@ -67,33 +78,31 @@ public class PartnerInterviewController {
                 }
             }
         }
+        ProfileCardBuilder.decorateScreen(root, STORE, () -> {
+            refreshTeachersList();
+            refreshAvailableSlots();
+            refreshView();
+        });
 
-        List<TeacherProfile> sharedTeachers = STORE.visibleTeachers(currentPartner(), "PARTNER");
-        if (teacherSelector != null) {
-            teacherSelector.getItems().setAll(sharedTeachers);
-            teacherSelector.setConverter(new StringConverter<>() {
-                @Override
-                public String toString(TeacherProfile teacher) {
-                    return teacher == null ? "" : teacher.getName() + " (" + teacher.getNationality() + " · " + teacher.getExpectedSalary() + ")";
-                }
-
-                @Override
-                public TeacherProfile fromString(String value) {
-                    return null;
+        if (leadDaysCombo != null) {
+            leadDaysCombo.getItems().setAll(1, 2, 3, 5, 7, 14);
+            leadDaysCombo.setValue(STORE.getNotificationLeadDays());
+            leadDaysCombo.valueProperty().addListener((obs, oldVal, val) -> {
+                if (val != null) {
+                    STORE.setNotificationLeadDays(currentPartner(), val);
+                    renderNotifications();
                 }
             });
-            TeacherProfile initial = sharedTeachers.stream()
-                    .filter(t -> t.getId() == preselectedTeacherId)
-                    .findFirst()
-                    .orElse(sharedTeachers.isEmpty() ? null : sharedTeachers.get(0));
-            if (initial != null) {
-                teacherSelector.setValue(initial);
-            }
-            teacherSelector.valueProperty().addListener((obs, oldValue, newValue) -> refreshAvailableSlots());
         }
+        if (rescheduleDatePicker != null && rescheduleDatePicker.getValue() == null) {
+            rescheduleDatePicker.setValue(LocalDate.now().plusDays(1));
+        }
+
+        refreshTeachersList();
         refreshAvailableSlots();
 
         if (requestInterviewButton != null) requestInterviewButton.setOnAction(e -> handleRequestInterview());
+        if (rescheduleInterviewButton != null) rescheduleInterviewButton.setOnAction(e -> handleRescheduleInterview());
         if (sendResultButton != null) sendResultButton.setOnAction(e -> handleSendResult());
         if (openPartnerMeetButton != null) openPartnerMeetButton.setOnAction(e -> openMeet());
         if (nav_PartnerDashboard != null) nav_PartnerDashboard.setOnAction(e -> navigate("PartnerDashboard.fxml"));
@@ -102,6 +111,35 @@ public class PartnerInterviewController {
         if (nav_Login != null) nav_Login.setOnAction(e -> navigate("Login.fxml"));
 
         refreshView();
+    }
+
+    private void refreshTeachersList() {
+        List<TeacherProfile> sharedTeachers = STORE.visibleTeachers(currentPartner(), "PARTNER");
+        if (teacherSelector != null) {
+            TeacherProfile prev = teacherSelector.getValue();
+            teacherSelector.getItems().setAll(sharedTeachers);
+            teacherSelector.setConverter(new StringConverter<>() {
+                @Override
+                public String toString(TeacherProfile teacher) {
+                    return teacher == null ? "" : teacher.getName() + " ("
+                            + CatalogData.formatNationality(teacher.getNationality()) + " · "
+                            + CatalogData.formatSalary(teacher.getExpectedSalary()) + ")";
+                }
+
+                @Override
+                public TeacherProfile fromString(String value) {
+                    return null;
+                }
+            });
+            TeacherProfile initial = sharedTeachers.stream()
+                    .filter(t -> t.getId() == preselectedTeacherId || (prev != null && t.getId() == prev.getId()))
+                    .findFirst()
+                    .orElse(sharedTeachers.isEmpty() ? null : sharedTeachers.get(0));
+            if (initial != null) {
+                teacherSelector.setValue(initial);
+            }
+            teacherSelector.valueProperty().addListener((obs, oldValue, newValue) -> refreshAvailableSlots());
+        }
     }
 
     private String currentPartner() {
@@ -129,7 +167,8 @@ public class PartnerInterviewController {
 
         boolean created = STORE.requestInterview(selectedTeacher.getId(), username, dateTime);
         if (!created) {
-            showError("Request failed", "The interview request could not be saved.");
+            showError("Schedule Conflict / Request Rejected",
+                    "Could not create the interview request (either access is not granted or there is an overlapping interview slot).");
             return;
         }
         if (requestMessage != null && requestMessage.getText() != null && !requestMessage.getText().isBlank()) {
@@ -138,6 +177,47 @@ public class PartnerInterviewController {
         refreshAvailableSlots();
         refreshView();
         showInfo("Request sent", "Interview request saved for " + selectedTeacher.getName() + " at " + slot + ". Meeting link generated and ready!");
+    }
+
+    private void handleRescheduleInterview() {
+        String selected = interviewSelector == null ? null : interviewSelector.getValue();
+        Interview interview = selected == null ? null : findInterviewFromLabel(selected);
+        if (interview == null) {
+            List<Interview> visible = STORE.visibleInterviews("PARTNER", currentPartner());
+            if (!visible.isEmpty()) interview = visible.get(0);
+        }
+        if (interview == null) {
+            showError("No interview selected", "Select an interview to reschedule.");
+            return;
+        }
+        LocalDate date = rescheduleDatePicker == null ? null : rescheduleDatePicker.getValue();
+        String fromText = comboText(rescheduleFromCombo);
+        String toText = comboText(rescheduleToCombo);
+        if (date == null || fromText.isBlank() || toText.isBlank()) {
+            showError("Missing time slot", "Choose a date, start time, and end time (HH:mm).");
+            return;
+        }
+        try {
+            LocalDateTime startAt = LocalDateTime.of(date, LocalTime.parse(fromText));
+            LocalDateTime endAt = LocalDateTime.of(date, LocalTime.parse(toText));
+            if (!STORE.rescheduleInterview(currentPartner(), interview.getId(), startAt, endAt)) {
+                showError("Schedule Conflict", STORE.getLastValidationError());
+                return;
+            }
+            refreshView();
+            showInfo("Interview Rescheduled", "Updated interview schedule to " + formatDateTime(startAt.toString())
+                    + " - " + endAt.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")) + " (UTC+7).");
+        } catch (Exception ex) {
+            showError("Invalid time format", "Please enter times in HH:mm format.");
+        }
+    }
+
+    private String comboText(ComboBox<String> combo) {
+        if (combo == null) return "";
+        if (combo.isEditable() && combo.getEditor() != null && combo.getEditor().getText() != null && !combo.getEditor().getText().isBlank()) {
+            return combo.getEditor().getText().trim();
+        }
+        return combo.getValue() == null ? "" : combo.getValue().trim();
     }
 
     private void handleSendResult() {
@@ -178,6 +258,9 @@ public class PartnerInterviewController {
 
     private void refreshView() {
         String username = currentPartner();
+        if (leadDaysCombo != null) {
+            leadDaysCombo.setValue(STORE.getNotificationLeadDays());
+        }
         List<Interview> interviews = STORE.visibleInterviews("PARTNER", username);
         if (interviewSelector != null) {
             String previous = interviewSelector.getValue();
@@ -189,6 +272,25 @@ public class PartnerInterviewController {
             }
         }
         renderRequests(interviews);
+        renderNotifications();
+    }
+
+    private void renderNotifications() {
+        if (partnerNotificationsBox == null) return;
+        partnerNotificationsBox.getChildren().clear();
+        List<NotificationItem> notes = STORE.notificationsForUser(currentPartner());
+        if (notes.isEmpty()) {
+            Label none = new Label("No upcoming interview reminders within " + STORE.getNotificationLeadDays() + " day(s) or new result updates.");
+            none.getStyleClass().add("muted");
+            partnerNotificationsBox.getChildren().add(none);
+            return;
+        }
+        for (NotificationItem item : notes) {
+            Label line = new Label("• [" + item.getCreatedAt() + "] " + item.getMessage());
+            line.setWrapText(true);
+            line.getStyleClass().add("table-text");
+            partnerNotificationsBox.getChildren().add(line);
+        }
     }
 
     private void refreshAvailableSlots() {
@@ -215,9 +317,13 @@ public class PartnerInterviewController {
             row.setAlignment(Pos.CENTER_LEFT);
             row.getStyleClass().add("table-row");
             row.getChildren().add(cell(safe(interview.getTeacherName()), 200));
-            row.getChildren().add(cell(formatDateTime(safe(interview.getDateTime())), 220));
+            row.getChildren().add(cell(formatTimeRange(interview), 220));
 
-            Label statusBadge = new Label(safe(interview.getStatus()));
+            String statusText = safe(interview.getStatus());
+            if (!safe(interview.getResult()).isBlank() && !"Pending".equalsIgnoreCase(safe(interview.getResult()))) {
+                statusText += " · " + safe(interview.getResult());
+            }
+            Label statusBadge = new Label(statusText);
             String badgeClass = "CONFIRMED".equalsIgnoreCase(interview.getStatus()) ? "badge-green" : "badge-amber";
             statusBadge.getStyleClass().addAll("badge", badgeClass);
             VBox statusCol = new VBox(statusBadge);
@@ -259,8 +365,23 @@ public class PartnerInterviewController {
             HBox.setHgrow(linkCol, Priority.ALWAYS);
 
             row.getChildren().add(linkCol);
+            row.setOnMouseClicked(e -> {
+                if (interviewSelector != null) {
+                    interviewSelector.setValue(interviewLabel(interview));
+                }
+            });
             requestsTable.getChildren().add(row);
         }
+    }
+
+    private String formatTimeRange(Interview interview) {
+        LocalDateTime start = PortalStore.parseInterviewStart(interview.getDateTime());
+        LocalDateTime end = PortalStore.parseInterviewEnd(interview);
+        if (start != null && end != null) {
+            return start.format(DateTimeFormatter.ofPattern("dd/MM/yyyy · HH:mm"))
+                    + " - " + end.format(DateTimeFormatter.ofPattern("HH:mm")) + " (UTC+7)";
+        }
+        return formatDateTime(safe(interview.getDateTime()));
     }
 
     private void joinAndCopyMeetUrl(String meetUrl) {

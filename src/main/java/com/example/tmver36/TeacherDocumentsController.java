@@ -74,6 +74,10 @@ public class TeacherDocumentsController {
 
         updateSidebarHeader(root);
         renderDocuments();
+        ProfileCardBuilder.decorateScreen(root, STORE, () -> {
+            updateSidebarHeader(root);
+            renderDocuments();
+        });
     }
 
     private void updateSidebarHeader(Parent root) {
@@ -90,6 +94,7 @@ public class TeacherDocumentsController {
         for (Label avatarSmall : FxNodes.findAllByStyleClass(root, "avatar-small", Label.class)) {
             avatarSmall.setText(initials);
         }
+        ProfileCardBuilder.updateAvatarSlot(root, profile, 50);
     }
 
     private void bindNavigation() {
@@ -105,7 +110,7 @@ public class TeacherDocumentsController {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Choose a document");
         chooser.getExtensionFilters().addAll(
-                new FileChooser.ExtensionFilter("Documents & Media", "*.pdf", "*.doc", "*.docx", "*.jpg", "*.jpeg", "*.png", "*.mp4", "*.mov", "*.webm", "*.html"),
+                new FileChooser.ExtensionFilter("Documents & Media", "*.pdf", "*.doc", "*.docx", "*.jpg", "*.jpeg", "*.png", "*.mp4", "*.mov", "*.webm", "*.mkv", "*.avi", "*.html"),
                 new FileChooser.ExtensionFilter("All files", "*.*")
         );
         chosenFile = chooser.showOpenDialog(window);
@@ -230,8 +235,10 @@ public class TeacherDocumentsController {
     }
 
     private void open(TeacherDocument document) {
-        if (document == null || !STORE.openDocument(currentActor(), document)) {
-            showError("Document unavailable", "No URL or local file is stored for this document.");
+        if (!ProfileCardBuilder.openDocumentWithAuthAndPlayback(STORE, currentActor(), document, documentsTable)) {
+            if (document == null) {
+                showError("Document unavailable", "No URL or local file is stored for this document.");
+            }
         }
     }
 

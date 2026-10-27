@@ -41,6 +41,8 @@ public class AdminLogsController {
     @FXML
     private void initialize() {
         resolveUnidentifiedNodes();
+        Parent root = FxNodes.rootOf(nav_AdminLogs, searchLogsButton, logSearch, logDate);
+        ProfileCardBuilder.decorateScreen(root, STORE, this::handleSearch);
         if (searchLogsButton != null) searchLogsButton.setOnAction(e -> handleSearch());
         if (logSearch != null) {
             logSearch.setOnAction(e -> handleSearch());

@@ -21,6 +21,8 @@ public class TeacherProfile {
     private String availableStartDate;
     private String timezone;
     private String avatarUrl;
+    private String avatarBase64 = "";
+    private String updatedAt = "";
     private String cvUrl;
     private String certificateUrl;
     private String introVideoUrl;
@@ -250,6 +252,9 @@ public class TeacherProfile {
 
     public void setAvailability(String availability) {
         this.availability = nn(availability);
+        if (!this.availability.isBlank()) {
+            this.availableStartDate = this.availability;
+        }
     }
 
     public String getPhone() {
@@ -405,5 +410,21 @@ public class TeacherProfile {
             sb.append(val ? '1' : '0');
         }
         this.reviewChecklist = sb.toString();
+    }
+
+    public String getAvatarBase64() {
+        return nn(avatarBase64);
+    }
+
+    public void setAvatarBase64(String avatarBase64) {
+        this.avatarBase64 = nn(avatarBase64);
+    }
+
+    public String getUpdatedAt() {
+        return nn(updatedAt);
+    }
+
+    public void setUpdatedAt(String updatedAt) {
+        this.updatedAt = nn(updatedAt);
     }
 }

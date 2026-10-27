@@ -106,6 +106,10 @@
                     <Label styleClass="field-label" text="Expected Salary" />
                     <ComboBox fx:id="salaryFilter" maxWidth="Infinity" />
                   </VBox>
+                  <VBox spacing="6" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Shortlist Filter" />
+                    <ComboBox fx:id="shortlistFilter" maxWidth="Infinity" />
+                  </VBox>
                   <HBox alignment="BOTTOM_LEFT" spacing="8">
                     <Button fx:id="searchGrantedButton" styleClass="primary" text="Search" />
                     <Button fx:id="clearPartnerFiltersButton" styleClass="secondary" text="Clear" />
@@ -126,6 +130,11 @@
                   <Button fx:id="nav_PartnerProfile__4" managed="false" visible="false" text="View profile &amp; video" />
                 </HBox>
                 <FlowPane fx:id="partnerCardGrid" hgap="16" styleClass="profile-card-grid" vgap="16" />
+                <HBox alignment="CENTER_RIGHT" spacing="10">
+                  <Button fx:id="prevPageButton" styleClass="secondary,button-sm" text="← Prev" />
+                  <Label fx:id="pageInfoLabel" styleClass="muted" text="Page 1 / 1" />
+                  <Button fx:id="nextPageButton" styleClass="secondary,button-sm" text="Next →" />
+                </HBox>
               </VBox>
             </VBox>
           </content>

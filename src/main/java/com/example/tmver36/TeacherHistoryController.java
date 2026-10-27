@@ -35,6 +35,8 @@ public class TeacherHistoryController {
     @FXML
     private void initialize() {
         wireNavigation();
+        Parent root = FxNodes.rootOf(nav_TeacherHistory, nav_TeacherProfile, historyTable);
+        ProfileCardBuilder.decorateScreen(root, STORE, this::refreshHistory);
         refreshHistory();
     }
 
@@ -60,6 +62,7 @@ public class TeacherHistoryController {
             for (Label label : FxNodes.findAllByStyleClass(root, "sidebar-name", Label.class)) {
                 label.setText(profile.getName());
             }
+            ProfileCardBuilder.updateAvatarSlot(root, profile, 50);
         }
 
         final long finalTeacherId = teacherId;

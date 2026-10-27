@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 public class StaffDashboardController {
 
     private static final PortalStore STORE = LoginController.STORE;
+    private static final int PAGE_SIZE = 6;
 
     @FXML private Button nav_StaffDashboard;
     @FXML private Button nav_StaffReview;
@@ -54,17 +55,22 @@ public class StaffDashboardController {
     @FXML private ComboBox<String> certificateFilter;
     @FXML private ComboBox<String> locationFilter; // Major / Degree filter (backward-compatible fx:id)
     @FXML private ComboBox<String> salaryFilter;
+    @FXML private ComboBox<String> shortlistFilter;
     @FXML private ComboBox<String> partnerAccessSelector;
     @FXML private Button filterProfilesButton;
     @FXML private Button clearFiltersButton;
     @FXML private Label countLabel;
     @FXML private VBox tableContainer;
     @FXML private FlowPane cardGridPane;
+    @FXML private Button prevPageButton;
+    @FXML private Button nextPageButton;
+    @FXML private Label pageInfoLabel;
 
     private final Set<String> selectedCertificates = new LinkedHashSet<>();
     private final List<CheckMenuItem> certMenuItems = new ArrayList<>();
     private List<TeacherProfile> filteredTeachers = new ArrayList<>();
     private boolean updatingNationalityItems;
+    private int currentPage = 1;
 
     @FXML
     private void initialize() {
@@ -76,24 +82,25 @@ public class StaffDashboardController {
         configureFilterControls();
         configurePartnerSelector();
         bindNavigation();
+        ProfileCardBuilder.decorateScreen(root, STORE, () -> {
+            configurePartnerSelector();
+            applyFilters();
+        });
 
-        if (filterProfilesButton != null) filterProfilesButton.setOnAction(e -> applyFilters());
+        if (filterProfilesButton != null) filterProfilesButton.setOnAction(e -> { currentPage = 1; applyFilters(); });
         if (clearFiltersButton != null) clearFiltersButton.setOnAction(e -> resetFilters());
-        if (syncCloudButton != null) {
-            syncCloudButton.setOnAction(e -> {
-                STORE.syncFromCloud();
-                configurePartnerSelector();
-                applyFilters();
-            });
-        }
         if (profileSearch != null) {
-            profileSearch.setOnAction(e -> applyFilters());
-            profileSearch.textProperty().addListener((obs, oldV, newV) -> applyFilters());
+            profileSearch.setOnAction(e -> { currentPage = 1; applyFilters(); });
+            profileSearch.textProperty().addListener((obs, oldV, newV) -> { currentPage = 1; applyFilters(); });
         }
-        if (statusFilter != null) statusFilter.setOnAction(e -> applyFilters());
-        if (experienceFilter != null) experienceFilter.setOnAction(e -> applyFilters());
-        if (locationFilter != null) locationFilter.setOnAction(e -> applyFilters());
-        if (salaryFilter != null) salaryFilter.setOnAction(e -> applyFilters());
+        if (statusFilter != null) statusFilter.setOnAction(e -> { currentPage = 1; applyFilters(); });
+        if (experienceFilter != null) experienceFilter.setOnAction(e -> { currentPage = 1; applyFilters(); });
+        if (locationFilter != null) locationFilter.setOnAction(e -> { currentPage = 1; applyFilters(); });
+        if (salaryFilter != null) salaryFilter.setOnAction(e -> { currentPage = 1; applyFilters(); });
+        if (shortlistFilter != null) {
+            shortlistFilter.setOnAction(e -> { currentPage = 1; applyFilters(); });
+            shortlistFilter.valueProperty().addListener((obs, o, n) -> { currentPage = 1; applyFilters(); });
+        }
         if (certificateFilter != null) {
             certificateFilter.setOnAction(e -> {
                 String val = certificateFilter.getValue();
@@ -102,11 +109,32 @@ public class StaffDashboardController {
                     selectedCertificates.add(val.trim());
                 }
                 syncCertificateMenuText();
+                currentPage = 1;
                 applyFilters();
             });
         }
         if (partnerAccessSelector != null) {
-            partnerAccessSelector.valueProperty().addListener((obs, oldValue, newValue) -> applyFilters());
+            partnerAccessSelector.valueProperty().addListener((obs, oldValue, newValue) -> {
+                currentPage = 1;
+                applyFilters();
+            });
+        }
+        if (prevPageButton != null) {
+            prevPageButton.setOnAction(e -> {
+                if (currentPage > 1) {
+                    currentPage--;
+                    populateCards(filteredTeachers);
+                }
+            });
+        }
+        if (nextPageButton != null) {
+            nextPageButton.setOnAction(e -> {
+                int totalPages = Math.max(1, (int) Math.ceil((double) filteredTeachers.size() / PAGE_SIZE));
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    populateCards(filteredTeachers);
+                }
+            });
         }
 
         refreshMetrics();
@@ -129,10 +157,11 @@ public class StaffDashboardController {
                     } finally {
                         updatingNationalityItems = false;
                     }
+                    currentPage = 1;
                     applyFilters();
                 });
             }
-            nationalityFilter.setOnAction(e -> applyFilters());
+            nationalityFilter.setOnAction(e -> { currentPage = 1; applyFilters(); });
         }
 
         if (statusFilter != null) {
@@ -155,6 +184,11 @@ public class StaffDashboardController {
             salaryFilter.setValue("All");
         }
 
+        if (shortlistFilter != null) {
+            shortlistFilter.getItems().setAll(CatalogData.SHORTLIST_FILTER_OPTIONS);
+            shortlistFilter.setValue("All");
+        }
+
         if (certificateFilter != null) {
             certificateFilter.getItems().setAll(CatalogData.CERTIFICATE_FILTER_OPTIONS);
             certificateFilter.setValue("All");
@@ -172,6 +206,7 @@ public class StaffDashboardController {
                         selectedCertificates.remove(cert);
                     }
                     syncCertificateMenuText();
+                    currentPage = 1;
                     applyFilters();
                 });
                 certMenuItems.add(item);
@@ -208,12 +243,14 @@ public class StaffDashboardController {
         if (experienceFilter != null) experienceFilter.setValue("All");
         if (locationFilter != null) locationFilter.setValue("All");
         if (salaryFilter != null) salaryFilter.setValue("All");
+        if (shortlistFilter != null) shortlistFilter.setValue("All");
         if (certificateFilter != null) certificateFilter.setValue("All");
         selectedCertificates.clear();
         for (CheckMenuItem item : certMenuItems) {
             item.setSelected(false);
         }
         syncCertificateMenuText();
+        currentPage = 1;
         applyFilters();
     }
 
@@ -288,6 +325,8 @@ public class StaffDashboardController {
         String experience = selected(experienceFilter);
         String majorOrDegree = selected(locationFilter);
         String salary = selected(salaryFilter);
+        String shortlistSel = selected(shortlistFilter);
+        String targetPartner = selectedPartnerUsername();
 
         filteredTeachers = STORE.teachers().stream().filter(t -> {
             String name = safe(t.getName());
@@ -310,13 +349,17 @@ public class StaffDashboardController {
             if (!selectedCertificates.isEmpty() && !CatalogData.matchesCertificatesFilter(certs, selectedCertificates)) return false;
             if (!CatalogData.matchesMajorOrDegreeFilter(degree, major.isBlank() ? subject : major, majorOrDegree)) return false;
             if (!CatalogData.matchesSalaryFilter(expectedSal, salary)) return false;
+            boolean shortlisted = STORE.isTeacherShortlistedByPartner(targetPartner, t.getId());
+            if (!CatalogData.matchesShortlistFilter(shortlisted, shortlistSel)) return false;
             return true;
         }).collect(Collectors.toList());
 
         populateCards(filteredTeachers);
-        if (countLabel != null) {
-            countLabel.setText("Showing " + filteredTeachers.size() + " of " + STORE.teachers().size() + " teacher profile(s)");
-        }
+    }
+
+    private String selectedPartnerUsername() {
+        String partnerUsername = partnerAccessSelector == null ? "partner" : partnerAccessSelector.getValue();
+        return (partnerUsername == null || partnerUsername.isBlank()) ? "partner" : partnerUsername;
     }
 
     private String selectedNationality() {
@@ -340,13 +383,24 @@ public class StaffDashboardController {
         cardGridPane.getChildren().clear();
         tableContainer.getChildren().setAll(cardGridPane);
 
-        String partnerUsername = partnerAccessSelector == null ? "partner" : partnerAccessSelector.getValue();
-        if (partnerUsername == null || partnerUsername.isBlank()) {
-            partnerUsername = "partner";
-        }
-        final String targetPartner = partnerUsername;
+        int total = teachers.size();
+        int totalPages = Math.max(1, (int) Math.ceil((double) total / PAGE_SIZE));
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+        int fromIdx = (currentPage - 1) * PAGE_SIZE;
+        int toIdx = Math.min(total, fromIdx + PAGE_SIZE);
+        List<TeacherProfile> pageSlice = total == 0 ? List.of() : teachers.subList(fromIdx, toIdx);
 
-        for (TeacherProfile teacher : teachers) {
+        if (prevPageButton != null) prevPageButton.setDisable(currentPage <= 1);
+        if (nextPageButton != null) nextPageButton.setDisable(currentPage >= totalPages);
+        if (pageInfoLabel != null) pageInfoLabel.setText("Page " + currentPage + " / " + totalPages);
+        if (countLabel != null) {
+            countLabel.setText("Showing " + pageSlice.size() + " (of " + total + " matched / " + STORE.teachers().size() + " total) teacher profile(s)");
+        }
+
+        final String targetPartner = selectedPartnerUsername();
+
+        for (TeacherProfile teacher : pageSlice) {
             boolean granted = STORE.canPartnerAccessTeacher(targetPartner, teacher.getId());
             int totalGranted = STORE.countPartnersGrantedForTeacher(teacher.getId());
             VBox card = ProfileCardBuilder.buildStaffTeacherCard(
@@ -365,7 +419,7 @@ public class StaffDashboardController {
             cardGridPane.getChildren().add(card);
         }
 
-        if (teachers.isEmpty()) {
+        if (pageSlice.isEmpty()) {
             Label emptyLabel = new Label("No teacher profiles match the current filters.");
             emptyLabel.getStyleClass().add("muted");
             VBox emptyBox = new VBox(emptyLabel);
@@ -376,9 +430,11 @@ public class StaffDashboardController {
 
     private void openTeacherDoc(TeacherProfile teacher, String category) {
         TeacherDocument doc = ProfileCardBuilder.findDocumentByCategory(STORE, teacher.getId(), category);
-        if (doc == null || !STORE.openDocument(currentActor(), doc)) {
-            LoginController.showAlert(Alert.AlertType.INFORMATION, "Document Preview",
-                    "No " + category + " file is currently available for " + teacher.getName() + ".");
+        if (!ProfileCardBuilder.openDocumentWithAuthAndPlayback(STORE, currentActor(), doc, tableContainer)) {
+            if (doc == null) {
+                LoginController.showAlert(Alert.AlertType.INFORMATION, "Document Preview",
+                        "No " + category + " file is currently available for " + teacher.getName() + ".");
+            }
         }
     }
 

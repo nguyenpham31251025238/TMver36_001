@@ -45,8 +45,8 @@
         <HBox alignment="CENTER_LEFT" spacing="12" styleClass="topbar">
           <Label styleClass="breadcrumb" text="Teacher / Availability &amp; Interviews" />
           <Region HBox.hgrow="ALWAYS" />
-          <Label styleClass="badge,badge-gray" text="DEMO" />
-          <Label styleClass="muted" text="14/10/2026" />
+          <Label styleClass="badge,badge-gray" text="LIVE" />
+          <Label styleClass="muted" text="27/10/2026" />
           <Label alignment="CENTER" minHeight="36" minWidth="36" styleClass="avatar-small" text="EM" />
         </HBox>
       </top>
@@ -61,6 +61,15 @@
                 </VBox>
                 <Region HBox.hgrow="ALWAYS" />
               </HBox>
+              <VBox spacing="10" styleClass="card">
+                <HBox alignment="CENTER_LEFT" spacing="12">
+                  <Label styleClass="section-title" text="Interview Reminders &amp; Notifications" />
+                  <Region HBox.hgrow="ALWAYS" />
+                  <Label styleClass="field-label" text="Notify before (days):" />
+                  <ComboBox fx:id="leadDaysCombo" prefWidth="95" />
+                </HBox>
+                <VBox fx:id="teacherNotificationsBox" spacing="6" />
+              </VBox>
               <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
                 <HBox alignment="CENTER_LEFT" spacing="12">
                   <Label styleClass="section-title" text="Available interview times" />
@@ -122,29 +131,11 @@
                     </VBox>
                   </HBox>
                   <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
-                    <VBox alignment="CENTER_LEFT" maxWidth="230" minWidth="230" prefWidth="230" spacing="0">
-                      <Label maxWidth="214" styleClass="table-text" text="16/10/2026" wrapText="true" />
-                    </VBox>
-                    <VBox alignment="CENTER_LEFT" maxWidth="270" minWidth="270" prefWidth="270" spacing="0">
-                      <Label maxWidth="254" styleClass="table-text" text="14:00 - 15:00" wrapText="true" />
-                    </VBox>
-                    <VBox alignment="CENTER_LEFT" maxWidth="230" minWidth="230" prefWidth="230" spacing="0">
-                      <Label styleClass="badge,badge-green" text="Available" />
-                    </VBox>
                     <VBox alignment="CENTER_LEFT" maxWidth="250" minWidth="250" prefWidth="250" spacing="0">
                       <Button fx:id="removeSlotButton" styleClass="danger" text="Delete time" />
                     </VBox>
                   </HBox>
                   <HBox alignment="CENTER_LEFT" spacing="0" styleClass="table-row">
-                    <VBox alignment="CENTER_LEFT" maxWidth="230" minWidth="230" prefWidth="230" spacing="0">
-                      <Label maxWidth="214" styleClass="table-text" text="19/10/2026" wrapText="true" />
-                    </VBox>
-                    <VBox alignment="CENTER_LEFT" maxWidth="270" minWidth="270" prefWidth="270" spacing="0">
-                      <Label maxWidth="254" styleClass="table-text" text="09:00 - 10:00" wrapText="true" />
-                    </VBox>
-                    <VBox alignment="CENTER_LEFT" maxWidth="230" minWidth="230" prefWidth="230" spacing="0">
-                      <Label styleClass="badge,badge-green" text="Available" />
-                    </VBox>
                     <VBox alignment="CENTER_LEFT" maxWidth="250" minWidth="250" prefWidth="250" spacing="0">
                       <Button fx:id="removeSlot2Button" styleClass="danger" text="Delete time" />
                     </VBox>
@@ -170,7 +161,7 @@
                 <Label maxWidth="Infinity" styleClass="note" text="After your confirmation, Matching finalizes the schedule and provides the Meet link for both parties." wrapText="true" />
               </VBox>
               <VBox spacing="16" styleClass="card" HBox.hgrow="ALWAYS">
-                <Label styleClass="section-title" text="Confirmed interviews" />
+                <Label styleClass="section-title" text="Confirmed interviews &amp; results" />
                 <Label styleClass="body" text="Green English Center · 20/10/2026 · 10:00 - 10:30 · UTC+7" />
                 <HBox alignment="CENTER_LEFT" spacing="12">
                   <VBox spacing="7" HBox.hgrow="ALWAYS">

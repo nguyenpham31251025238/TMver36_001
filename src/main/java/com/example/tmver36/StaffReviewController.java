@@ -79,6 +79,10 @@ public class StaffReviewController {
         configureTeacherSelector();
         bindNavigation();
         bindDocumentButtons();
+        ProfileCardBuilder.decorateScreen(root, STORE, () -> {
+            configureTeacherSelector();
+            refreshProfileView();
+        });
         bindChecklistListeners();
         if (requestChangesButton != null) requestChangesButton.setOnAction(e -> requestChanges());
         if (markQcvButton != null) markQcvButton.setOnAction(e -> markPendingQcv());
@@ -196,10 +200,12 @@ public class StaffReviewController {
     private void openCategoryDocument(String category) {
         if (currentTeacher == null) return;
         TeacherDocument doc = ProfileCardBuilder.findDocumentByCategory(STORE, currentTeacher.getId(), category);
-        if (doc != null && STORE.openDocument(currentActor(), doc)) {
+        if (ProfileCardBuilder.openDocumentWithAuthAndPlayback(STORE, currentActor(), doc, documentsTable)) {
             return;
         }
-        showError("Document unavailable", "No " + category + " document is currently uploaded for " + safe(currentTeacher.getName()) + ".");
+        if (doc == null) {
+            showError("Document unavailable", "No " + category + " document is currently uploaded for " + safe(currentTeacher.getName()) + ".");
+        }
     }
 
     private void refreshProfileView() {
@@ -225,9 +231,11 @@ public class StaffReviewController {
             );
         }
         if (teacherMetaLabel != null) {
-            String salary = safe(currentTeacher.getExpectedSalary()).isBlank() ? "Negotiable" : safe(currentTeacher.getExpectedSalary());
+            String salary = CatalogData.formatSalary(currentTeacher.getExpectedSalary());
             String availableFrom = safe(currentTeacher.getAvailableFrom()).isBlank() ? "Immediate" : safe(currentTeacher.getAvailableFrom());
-            teacherMetaLabel.setText("Expected Salary: " + salary + " / month · Available: " + availableFrom + " · Location: " + safe(currentTeacher.getLocation()));
+            String updatedAt = safe(currentTeacher.getUpdatedAt()).isBlank() ? "UTC+7" : safe(currentTeacher.getUpdatedAt());
+            teacherMetaLabel.setText("Expected Salary: " + salary + " / month · Available: " + availableFrom
+                    + " · Location: " + safe(currentTeacher.getLocation()) + " · Updated: " + updatedAt);
         }
         if (statusBadgeLabel != null) {
             statusBadgeLabel.setText(CatalogData.formatStatusBadge(currentTeacher.getStatus()));
@@ -287,11 +295,7 @@ public class StaffReviewController {
 
             Button openBtn = new Button(doc.getCategory().toLowerCase().contains("video") ? "Watch" : "Open");
             openBtn.getStyleClass().addAll("button-sm", "secondary");
-            openBtn.setOnAction(e -> {
-                if (!STORE.openDocument(currentActor(), doc)) {
-                    showError("Document unavailable", "Could not open " + doc.getFileName());
-                }
-            });
+            openBtn.setOnAction(e -> ProfileCardBuilder.openDocumentWithAuthAndPlayback(STORE, currentActor(), doc, openBtn));
 
             Button downloadBtn = new Button("Download");
             downloadBtn.getStyleClass().addAll("button-sm", "secondary");

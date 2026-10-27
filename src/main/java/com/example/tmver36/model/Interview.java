@@ -1,8 +1,8 @@
 package com.example.tmver36.model;
 
-public class Interview {
-    private long id;
-    private long teacherId;
+public final class Interview {
+    private final long id;
+    private final long teacherId;
     private String teacherName;
     private String partner;
     private String dateTime;
@@ -23,12 +23,27 @@ public class Interview {
             String feedback,
             String meetingUrl
     ) {
+        this(id, teacherId, teacherName, partner, dateTime, "", status, result, feedback, meetingUrl);
+    }
+
+    public Interview(
+            long id,
+            long teacherId,
+            String teacherName,
+            String partner,
+            String dateTime,
+            String endDateTime,
+            String status,
+            String result,
+            String feedback,
+            String meetingUrl
+    ) {
         this.id = id;
         this.teacherId = teacherId;
         this.teacherName = teacherName;
         this.partner = partner;
         this.dateTime = dateTime;
-        this.endDateTime = "";
+        this.endDateTime = endDateTime == null ? "" : endDateTime;
         this.status = status;
         this.result = result;
         this.feedback = feedback;
@@ -48,15 +63,23 @@ public class Interview {
     }
 
     public void setTeacherName(String teacherName) {
-        this.teacherName = teacherName;
+        this.teacherName = teacherName == null ? "" : teacherName;
     }
 
     public String getPartner() {
         return partner;
     }
 
+    public void setPartner(String partner) {
+        this.partner = partner == null ? "" : partner;
+    }
+
     public String getDateTime() {
         return dateTime;
+    }
+
+    public void setDateTime(String dateTime) {
+        this.dateTime = dateTime == null ? "" : dateTime;
     }
 
     public String getEndDateTime() {
