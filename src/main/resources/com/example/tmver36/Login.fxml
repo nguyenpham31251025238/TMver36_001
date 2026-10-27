@@ -17,7 +17,7 @@
 <?import javafx.scene.text.Font?>
 
 <HBox prefHeight="860" prefWidth="1280" stylesheets="@theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.tmver36.LoginController">
-  <VBox minWidth="440" prefWidth="520" spacing="28" style="-fx-background-image: url('@photo/bg_login.png'); -fx-background-size: cover; -fx-background-position: center;" styleClass="login-left">
+  <VBox minWidth="460" prefWidth="530" spacing="24" style="-fx-background-image: url('@photo/bg_login.png'); -fx-background-size: cover; -fx-background-position: center;" styleClass="login-left">
     <HBox alignment="CENTER_LEFT" spacing="12">
       <ImageView fx:id="loginLogoView" fitHeight="38" fitWidth="38" pickOnBounds="true" preserveRatio="true">
         <image>
@@ -27,16 +27,24 @@
       <Label styleClass="brand" text="TeacherMatch" />
     </HBox>
     <Region VBox.vgrow="ALWAYS" />
-    <Label styleClass="login-hero" text="Right teacher. Right opportunity." wrapText="true">
-      <font>
-        <Font name="Candara Bold" size="12.0" />
-      </font>
-    </Label>
-    <Label styleClass="login-sub" text="Connect verified teacher profiles, partner academies, and live interview rooms in one synchronized workspace." wrapText="true" />
-    <VBox spacing="16">
-      <Label styleClass="login-feature" text="01     Verified global ESL talent pool" />
-      <Label styleClass="login-feature" text="02     Seamless qCV &amp; qEP review workflow" />
-      <Label styleClass="login-feature" text="03     Multi-device cloud sync &amp; live meeting links" />
+    <VBox spacing="6">
+      <Label styleClass="login-hero" text="Right teacher." />
+      <Label styleClass="login-hero" text="Right opportunity." />
+    </VBox>
+    <Label maxWidth="420" styleClass="login-sub" text="Connect verified teacher profiles, partner academies, and live interview rooms in one synchronized workspace." wrapText="true" />
+    <VBox spacing="14" style="-fx-padding: 6 0 0 0;">
+      <HBox alignment="CENTER_LEFT" spacing="14">
+        <Label styleClass="login-feature-num" text="01" />
+        <Label styleClass="login-feature" text="Verified global ESL talent pool" />
+      </HBox>
+      <HBox alignment="CENTER_LEFT" spacing="14">
+        <Label styleClass="login-feature-num" text="02" />
+        <Label styleClass="login-feature" text="Seamless qCV &amp; qEP review workflow" />
+      </HBox>
+      <HBox alignment="CENTER_LEFT" spacing="14">
+        <Label styleClass="login-feature-num" text="03" />
+        <Label styleClass="login-feature" text="Multi-device cloud sync &amp; live meeting links" />
+      </HBox>
     </VBox>
     <Region VBox.vgrow="ALWAYS" />
     <Label styleClass="brand-sub" text="GLOBAL TEACHER RECRUITMENT / VIETNAM" />
