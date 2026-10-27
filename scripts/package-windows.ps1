@@ -60,6 +60,7 @@ New-Item -ItemType Directory -Force -Path $distDir | Out-Null
 
 $jpackageExe = Join-Path $env:JAVA_HOME "bin\jpackage.exe"
 $signScript = Join-Path $PSScriptRoot "sign-windows.ps1"
+$iconPath = Join-Path $ProjectRoot "src\main\resources\com\example\tmver36\logo.ico"
 
 # 1. Build self-contained app-image first (used both for Portable ZIP and to sign TeacherMatch.exe)
 $appImageRoot = Join-Path $env:TEMP "tmver36-app-image"
@@ -122,7 +123,6 @@ foreach ($type in $installerTypes) {
         --app-version $AppVersion `
         --vendor "TeacherMatch" `
         --description "TeacherMatch Desktop Application (TMver36)" `
-        --icon $iconPath `
         --dest $distDir `
         --app-image $appImageDir `
         --win-per-user-install `
